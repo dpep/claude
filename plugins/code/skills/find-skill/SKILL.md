@@ -45,7 +45,7 @@ find-skill --reset         delete config + cache (clean slate)
 
 ```sh
 find-skill -1 git          # -> <checkout>/plugins/code/skills/git/SKILL.md
-find-skill --json azimuth  # path + description + source, as JSON
+find-skill --json dataviz  # path + description + source, as JSON
 ```
 
 Then Read the printed path. Once the working repo is registered (below), the

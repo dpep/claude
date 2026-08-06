@@ -43,7 +43,7 @@ A 3×3 grid (Simon & Agazarian, 1960s):
 
 **Label behaviors, not people.** Say "this utterance is 1 FIGHTING," not "she is fighting." A person can fluidly cross cells across utterances; pinning them as a category is wrong.
 
-For depth see the azimuth plugin's SAVI reference (`~/.claude/plugins/azimuth/skills/azimuth/references/savi.md`, if azimuth is installed).
+The nine-cell grid above is the working subset; Simon & Agazarian's SAVI is the full treatment.
 
 ### SCT phase / subphase indicators
 
@@ -58,7 +58,7 @@ Infer phase/subphase from SAVI distribution:
 
 State your phase inference with confidence calibrated to evidence: "Likely flight subphase based on heavy 2 OBSCURING and absence of green 8 RESPONDING." Don't overclaim.
 
-For depth see the azimuth plugin's `sct-systems-centered.md` reference (if installed).
+Agazarian's Systems-Centered Theory is the full treatment.
 
 ### Boundaries, curiosity, and implicit goals
 
@@ -119,7 +119,7 @@ Emotional reactivity and role confusion are also noise; they already surface in 
 
 Rate **per participant** (how clearly each person is communicating) and give one **overall band** for the conversation. Calibrate to evidence; cite the noise that drives the rating.
 
-For depth see the azimuth plugin's `shannon-communication.md` reference (if installed).
+Shannon & Weaver's model — and Weaver's three levels — is the full treatment.
 
 ## Output format
 
@@ -154,9 +154,10 @@ The user can resume this agent via SendMessage to add new data, ask follow-up qu
 
 ## References
 
-For your own reference (not for inclusion in the output to the user). These live in the **azimuth plugin** (`~/.claude/plugins/azimuth/skills/azimuth/references/`, if installed) — the analyst's frameworks share azimuth's theoretical lineage:
+Source literature for the lenses above, for your own grounding rather than for
+the report:
 
-- SAVI: `savi.md` — full 9-cell grid with behaviors
-- SCT: `sct-systems-centered.md` — phases, subphases, role induction
-- Lewin force-field: `lewin-force-field.md` — equilibrium, leverage
-- Shannon: `shannon-communication.md` — noise, signal-to-noise, Weaver's three levels
+- **SAVI** (Simon & Agazarian) — the full nine-cell grid and its behaviors
+- **Systems-Centered Theory** (Agazarian) — phases, subphases, role induction
+- **Force-field analysis** (Lewin) — equilibrium, driving/restraining forces, leverage
+- **Shannon & Weaver** — noise, signal-to-noise, Weaver's three levels

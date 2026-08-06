@@ -38,7 +38,7 @@ The throughline: respect the reader's time and attention. Every word earns its p
 
 - **Chat output meant for copy/paste**: no word-wrapping, no padding spaces, no bold section headers; format URLs as clickable markdown links. (Inside a *document*, PR body, or ticket, use the formatting that medium expects — these lean rules are for replies, not artifacts.)
 - **Slack and GitHub comments posted on the owner's behalf**: prefix with `claudomatic:`.
-- **PR titles**: under ~50 characters, JIRA ticket prefix when applicable (`[THICKET-474] Fix flaky spec`); name the effect, not the mechanism. Open PRs in draft.
+- **PR titles**: under ~50 characters, JIRA ticket prefix when applicable (`[PROJ-474] Fix flaky spec`); name the effect, not the mechanism. Open PRs in draft.
 - **Links**: prefer permalinks (commit-pinned) over branch refs; format people as `@handle`, tickets as full JIRA URLs, PRs as full GitHub URLs.
 - **Don't credit the author / no attribution boilerplate** in frontmatter, descriptions, or doc headers; keep it lean.
 
