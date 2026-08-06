@@ -1,6 +1,6 @@
 # code
 
-Programming workflow & code-navigation skills. No hooks; the `rq` and `find-skill` skills each drive a small companion CLI.
+Programming workflow & code-navigation skills. No hooks; the `rq` and `gqls` skills drive companion CLIs, and `find-gem` ships as a script.
 
 ## Install
 
@@ -15,14 +15,6 @@ Programming workflow & code-navigation skills. No hooks; the `rq` and `find-skil
 - **rq** — find where a symbol is defined via the `rq` CLI; ranks the most-likely
   definition first (prefer over grep/rg for "where is X defined"). Includes
   binary install/update guidance (`brew install dpep/tools/rq`).
-- **find-skill** — find where a *skill* is defined: fuzzy-match Claude Code skills
-  by name/description and print the path to open or edit. Counts skills the way
-  Claude Code does — a `<name>/SKILL.md` or a `commands/*.md`, with the same
-  frontmatter fallbacks — resolves to the editable working-repo copy
-  (matched by GitHub remote) once you register the checkout with
-  `find-skill --add <dir>`, and marks a skill `(disabled)` when its plugin is
-  cached but missing from `enabledPlugins`. Built from this repo —
-  `make install` links the binary into `~/.claude/bin` (add it to your PATH).
 - **find-gem** — locate an installed Ruby *gem's* source and search inside it
   (`find-gem <gem> [rg pattern]`), bundle-aware, with `-j/--json` and
   `-J/--ndjson` like the other CLIs. A bash script shipped in this

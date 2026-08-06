@@ -27,9 +27,19 @@ Skills and agent prompts that are useful to someone who isn't Daniel, and that
 carry no data. Anything holding memory, goals, or org vocabulary stays in the
 private repo.
 
-If a plugin here needs an external binary (`rq`, `gqls`), it must be publicly
-installable and the README must say so — a skill whose CLI nobody can get is
-worse than no skill.
+If a plugin here needs an external binary it must be publicly obtainable, and
+the README must say how. A skill whose CLI nobody can get is worse than no
+skill. Two shapes:
+
+- **Built here** — the crate lives in `rust/` and `make install` puts it on
+  PATH. Every crate must build from a clone of this repo alone: no path
+  dependencies pointing outside the workspace. That rule is the whole reason
+  `find-skill` could be published — it needed two twelve-line path helpers from
+  a private shared crate, and inlining them cut the tie.
+- **Its own repo** — `rq` and `gqls` are substantial enough to carry their own
+  release pipeline and Homebrew formula, and they ship their own skills.
+
+Small one-off tools take the first shape. A tool doesn't each earn a repo.
 
 ## Sibling repos
 

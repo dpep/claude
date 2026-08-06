@@ -1,0 +1,32 @@
+# find-skill-core — pure logic for the `find-skill` CLI.
+#
+# Locates Claude Code skills across three source kinds — personal
+# (~/.claude/skills), installed marketplace checkouts, and local
+# working repos — parses their frontmatter, dedupes them, and ranks
+# them against a fuzzy query. All filesystem discovery is here; the
+# `-cli` crate is thin I/O + output glue.
+#
+# The expensive part (hunting for local working repos with skills) is
+# cached to a discovered-roots index; the cheap parts (personal +
+# installed trees) are always walked live, so skill edits show up
+# immediately without cache invalidation games.
+
+[package]
+name = "find-skill-core"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+time.workspace = true
+ignore.workspace = true
+nucleo-matcher.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

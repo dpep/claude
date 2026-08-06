@@ -1,0 +1,26 @@
+# find-skill-cli — the `find-skill` binary. Thin I/O + output glue
+# over find-skill-core: parse flags, run the pipeline, render text or
+# JSON/NDJSON. Installed to ~/.claude/bin/find-skill by `make install`.
+
+[package]
+name = "find-skill-cli"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[[bin]]
+name = "find-skill"
+path = "src/main.rs"
+
+[dependencies]
+find-skill-core = { path = "../find-skill-core" }
+anyhow.workspace = true
+clap.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

@@ -1,0 +1,37 @@
+# Cargo workspace for the binaries this marketplace's plugins call.
+#
+# A skill is markdown; some skills drive a small CLI. Those CLIs live here
+# rather than in repos of their own — one-off tools don't each justify a
+# repo, a release pipeline and a formula. Substantial standalone tools do:
+# rq and gqls have their own repos and ship their own skills.
+#
+# Every crate here must be buildable by someone who cloned only this repo.
+# No path dependencies outside this workspace — that constraint is what
+# keeps the public plugins genuinely installable.
+
+[workspace]
+resolver = "2"
+members = ["crates/find-skill-core", "crates/find-skill-cli"]
+
+# Shared versions, inherited by members via `dep.workspace = true`, so the
+# whole workspace compiles against one compatible set.
+[workspace.dependencies]
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+ignore = "0.4"
+nucleo-matcher = "0.3"
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+tempfile = "3"
+time = { version = "0.3", features = ["macros", "serde", "formatting", "parsing"] }
+
+[workspace.lints.clippy]
+doc_overindented_list_items = "allow"
+doc_lazy_continuation = "allow"
+
+# Small, fast binaries — these get symlinked onto PATH and invoked per hook
+# or per skill call, so startup and size matter more than compile time.
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "symbols"
