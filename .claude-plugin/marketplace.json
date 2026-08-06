@@ -1,0 +1,19 @@
+{
+  "name": "claude",
+  "owner": {
+    "name": "Daniel Pepper",
+    "url": "https://github.com/dpep"
+  },
+  "plugins": [
+    {
+      "name": "code",
+      "source": "./plugins/code",
+      "description": "Programming workflow & code-navigation skills: git (branches, PRs, worktrees), rq (find a definition by name), gqls (search a GraphQL schema — fuzzy/semantic, or jump to a resolver), find-skill (find where a skill is defined), and find-gem (locate + search installed Ruby gem source)."
+    },
+    {
+      "name": "personas",
+      "source": "./plugins/personas",
+      "description": "Reusable agent personas — craft & analysis experts (analyst, librarian, rubyist, scribe) and a moderator-chaired decision council (PM, hacker, staff engineer, production engineer, platform expert, skeptic) you can summon in any project. Self-contained system prompts; most critique or do."
+    }
+  ]
+}

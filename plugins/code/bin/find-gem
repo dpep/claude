@@ -1,0 +1,117 @@
+#!/usr/bin/env bash
+# find-gem — locate an installed Ruby gem's source, optionally search inside it.
+#
+# usage:
+#   find-gem <gem>                    print the gem's source dir
+#   find-gem <gem> <pattern> [args]   rg <pattern> inside the gem; args go to rg
+#   find-gem <gem> -- [args]          hand everything after `--` to rg verbatim
+#
+# options:
+#   -j, --json     one JSON document: the gem, or an array of matches
+#   -J, --ndjson   newline-delimited JSON: one object per match
+#
+# Those four flags are find-gem's wherever they appear, so rg's short -j
+# (--threads) never reaches rg — use its long forms. Past a `--` nothing
+# counts as a flag, which is how a dash-leading pattern gets through.
+#
+# Bundle-aware: with a Gemfile in cwd (or BUNDLE_GEMFILE set) you get the
+# bundled version, otherwise the newest installed one.
+set -euo pipefail
+
+die() { echo "find-gem: $1" >&2; exit 1; }
+need() { command -v "$1" >/dev/null 2>&1 || die "$1 is not on PATH"; }
+
+# Pull the output flags out before anything else — every remaining
+# argument belongs to the gem name or to rg. A `--` ends our parsing and
+# is itself forwarded, so rg stops treating what follows as flags too:
+# that's how a dash-leading pattern gets searched for.
+mode=text
+argv=()
+verbatim=0
+for arg in "$@"; do
+  if [ "$verbatim" -eq 1 ]; then
+    argv+=("$arg")
+    continue
+  fi
+  case "$arg" in
+    --)          verbatim=1; argv+=("$arg") ;;
+    -j|--json)   mode=json ;;
+    -J|--ndjson) mode=ndjson ;;
+    *)           argv+=("$arg") ;;
+  esac
+done
+set -- ${argv[@]+"${argv[@]}"}
+
+# The header comment above is the help text.
+usage() { sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'; }
+
+if [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; then
+  usage
+  exit 0
+fi
+if [ $# -lt 1 ]; then
+  usage >&2
+  exit 1
+fi
+
+gem_name="$1"
+shift
+
+dir=""
+if [ -n "${BUNDLE_GEMFILE:-}" ] || [ -f Gemfile ]; then
+  dir=$(bundle info --path "$gem_name" 2>/dev/null || true)
+fi
+if [ -z "$dir" ]; then
+  need ruby
+  dir=$(ruby -e 'puts Gem::Specification.find_by_name(ARGV[0]).gem_dir' "$gem_name" 2>/dev/null || true)
+fi
+if [ -z "$dir" ] || [ ! -d "$dir" ]; then
+  die "could not locate gem '$gem_name'"
+fi
+
+if [ $# -eq 0 ]; then
+  if [ "$mode" = text ]; then
+    echo "$dir"
+  else
+    need ruby
+    ruby -rjson -e 'puts JSON.generate({ "gem" => ARGV[0], "dir" => ARGV[1] })' "$gem_name" "$dir"
+  fi
+  exit 0
+fi
+
+need rg
+if [ "$mode" = text ]; then
+  rg --line-number "$@" "$dir"
+  exit 0
+fi
+need ruby
+
+# Structured search: let rg emit its own event stream and reshape it, so
+# escaping and encoding stay rg's problem rather than the shell's. The
+# stream is collected first — a half-written array on stdout would read
+# as "no matches" to whatever is parsing us.
+status=0
+events=$(rg --json "$@" "$dir") || status=$?
+[ "$status" -le 1 ] || exit "$status" # 1 is rg's "no matches"; >1 is a real failure
+
+printf '%s\n' "$events" | ruby -rjson -e '
+out = []
+STDIN.each_line do |line|
+  begin
+    event = JSON.parse(line)
+  rescue JSON::ParserError
+    next
+  end
+  next unless event["type"] == "match"
+  data = event["data"]
+  text = data["lines"]["text"]
+  next unless text
+  out << { "file" => data["path"]["text"], "line" => data["line_number"], "text" => text.chomp }
+end
+if ARGV[0] == "ndjson"
+  out.each { |match| puts JSON.generate(match) }
+else
+  puts JSON.generate(out)
+end
+' "$mode"
+exit "$status"
