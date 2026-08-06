@@ -7,7 +7,7 @@ parts of my setup that are useful to someone who isn't me.
 /plugin marketplace add dpep/claude
 ```
 
-Then install what you want from `/plugin`.
+It appears as **`dpep`**. Then install what you want from `/plugin`.
 
 ## Plugins
 
