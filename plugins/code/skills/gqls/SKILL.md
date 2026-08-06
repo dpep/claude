@@ -21,9 +21,11 @@ gqls <query> <source> --json
 
 `<source>` is a `.graphql`/`.graphqls` SDL file, a `.json` introspection dump,
 or an `http(s)://…/graphql` URL (introspected live). Omit it and gqls finds a
-schema in the current directory tree (`-v` shows which one it picked). Apollo
-Federation v2 subgraph SDL parses directly, and auto-discovery prefers a
-composed `supergraph*` schema when several exist.
+schema in the current directory tree (`-v` shows which one it picked), falling
+back to the enclosing git repo when the directory you're in has none — so you
+don't need to `cd` to the repo root first. Apollo Federation v2 subgraph SDL
+parses directly, and auto-discovery prefers a composed `supergraph*` schema
+when several exist.
 
 Each result is an object:
 
@@ -148,12 +150,19 @@ rather than pasting one silently). Input
 objects and enums referenced by the arguments are expanded underneath, so a
 `"<SomeInput!>"` placeholder can be filled without a second lookup.
 
+`-e` and `-R` only act on a field the query names outright (or misspells
+slightly — `Did you mean X?` on stderr says which, and is worth passing on).
+A looser query — `crtusr`, `User.`, a wildcard — answers `Did you mean:`
+with the matches and exits nonzero instead; re-run with the path you meant, or
+show the user the list if it isn't obvious which one they want.
+
 Two things still need your judgment:
 
-- **Ambiguous entry points.** If stderr says "also reachable via …", several
-  root fields return that type. gqls picks the one with the fewest required
-  arguments; in a federated schema another path may be the right one. Ask the
-  user rather than silently accepting the pick.
+- **Ambiguous entry points.** A `# paths` block under the draft means several
+  root fields return that type; the one drafted through is listed first. gqls
+  picks the one with the fewest required arguments; in a federated schema
+  another path may be the right one. Ask the user rather than silently
+  accepting the pick.
 - **Unreachable fields.** If it reports no root returns the type, don't invent
   a path — run `gqls --returns <Type>` and show what actually exists.
 
