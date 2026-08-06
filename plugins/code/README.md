@@ -30,3 +30,21 @@ These are *my* conventions, shipped so my Claude has the same workflow on every 
 ## Development
 
 See the repo-level [CLAUDE.md](../../CLAUDE.md).
+
+## Tools these skills drive
+
+Four skills call a CLI. A missing one doesn't fail loudly — Claude reads the
+skill, the command isn't found, and it falls back to grep — so a SessionStart
+hook reports which are absent and how to get each:
+
+| tool | install |
+|---|---|
+| `rq` | `brew install dpep/tools/rq` (or `cargo install reference-query`) |
+| `gqls` | `brew install dpep/tools/gqls` (or `cargo install gqls-cli`) |
+| `find-skill` | `cargo install --git https://github.com/dpep/claude find-skill-cli` |
+| `find-gem` | ships in `bin/` here — symlink it onto PATH |
+
+The hook is quiet when everything resolves, and speaks up out loud only when
+*nothing* does — a fresh install you probably meant to finish. If some tools
+are present and others aren't, it tells Claude and stays silent to you: these
+skills ship together and you may only want one of them.
