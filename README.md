@@ -84,13 +84,6 @@ Each is a self-contained system prompt. Most will either critique a plan or do
 the work, so they're useful as reviewers *and* as implementers — a staff
 engineer that only ever has opinions isn't much help.
 
-## Why so few?
-
-Because the rest is personal. My full setup lives in a private repo and holds
-memory, goals and org-specific vocabulary that would be noise to anyone else.
-These two carry no data — just skills and prompts — which is what makes them
-shareable.
-
 ## License
 
 MIT — see [LICENSE](LICENSE).
