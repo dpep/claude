@@ -1,0 +1,11 @@
+{
+  "name": "datasets",
+  "version": "0.1.4",
+  "description": "User-curated reference data — files at ~/.claude/datasets/ (md/csv/tsv/json/yaml) with frontmatter for discovery. Slash commands and a skill for create/list/search/show.",
+  "author": {
+    "name": "Daniel Pepper",
+    "url": "https://github.com/dpep"
+  },
+  "homepage": "https://github.com/dpep/claude/tree/main/plugins/datasets",
+  "license": "MIT"
+}

@@ -73,6 +73,14 @@ builds the binary, writes the settings block, and smoke-tests the render:
 cargo install --git https://github.com/dpep/claude statusbar-cli   # no clone needed
 ```
 
+### `datasets`
+
+Curated reference data Claude can find: markdown, CSV, TSV, JSON or YAML under
+`~/.claude/datasets`, each with frontmatter describing what it is and when to
+use it. Slash commands and a skill to create, list, search and show them.
+
+Nothing to build or install beyond the plugin.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
