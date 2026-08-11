@@ -18,8 +18,8 @@ Programming workflow & code-navigation skills. No hooks; the `rq` and `gqls` ski
 - **find-gem** — locate an installed Ruby *gem's* source and search inside it
   (`find-gem <gem> [rg pattern]`), bundle-aware, with `-j/--json` and
   `-J/--ndjson` like the other CLIs. A bash script shipped in this
-  plugin's `bin/` (on PATH inside Claude Code sessions); `make install-find-gem`
-  links it into `~/.claude/bin` for regular shells.
+  plugin's `bin/` (on PATH inside Claude Code sessions); `make install` at the
+  repo root links it into `~/.claude/bin` for regular shells.
 
 Will grow to cover review, testing, and language-specific patterns.
 
@@ -41,8 +41,8 @@ hook reports which are absent and how to get each:
 |---|---|
 | `rq` | `brew install dpep/tools/rq` (or `cargo install reference-query`) |
 | `gqls` | `brew install dpep/tools/gqls` (or `cargo install gqls-cli`) |
-| `find-skill` | `cargo install --git https://github.com/dpep/claude find-skill-cli` |
-| `find-gem` | ships in `bin/` here — symlink it onto PATH |
+| `find-skill` | `make -C ~/.claude/plugins/marketplaces/dpep install` |
+| `find-gem` | ships in `bin/` here — the same `make install` symlinks it |
 
 The hook is quiet when everything resolves, and speaks up out loud only when
 *nothing* does — a fresh install you probably meant to finish. If some tools

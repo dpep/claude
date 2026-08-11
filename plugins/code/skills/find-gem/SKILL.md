@@ -55,9 +55,11 @@ Then Read specific files from the printed paths as usual.
 ## Installing the CLI
 
 Inside Claude Code sessions the script is already on PATH (it ships in this
-plugin's `bin/`). For regular shells, symlink it into `~/.claude/bin` from
-your checkout of <https://github.com/dpep/claude>:
+plugin's `bin/`). For regular shells, symlink it into `~/.claude/bin`:
 
 ```sh
-make -C <repo> install-find-gem
+make -C ~/.claude/plugins/marketplaces/dpep install
 ```
+
+That links `find-gem` alongside the repo's other binaries. Working from your
+own clone instead? `make install` from its root.

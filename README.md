@@ -31,14 +31,15 @@ those two skills have nothing to call:
 brew install dpep/tools/rq dpep/tools/gqls
 ```
 
-`find-skill`, `find-gem` and `statusbar` are built and installed from this repo:
+`find-skill`, `find-gem` and `statusbar` are built from this repo. Adding the
+marketplace already cloned it, so there's nothing to fetch:
 
 ```sh
-git clone https://github.com/dpep/claude && cd claude
-make install     # builds rust/, symlinks them into ~/.claude/bin
+make -C ~/.claude/plugins/marketplaces/dpep install
 ```
 
-Add `~/.claude/bin` to your `PATH`.
+That builds `rust/` and symlinks the binaries into `~/.claude/bin` — add it to
+your `PATH`. Working from your own clone instead? `make install` from its root.
 
 ## Building
 

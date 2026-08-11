@@ -88,13 +88,16 @@ repos are currently discovered.
 
 ## Installing / updating the binary
 
-If `find-skill` isn't on PATH, build it from your checkout of
-<https://github.com/dpep/claude> (needs the Rust toolchain), then retry:
+If `find-skill` isn't on PATH, build it (needs the Rust toolchain) and retry.
+Installing this plugin already cloned the marketplace, so there's nothing to
+fetch:
 
 ```sh
-make -C <repo> install-find-skill   # builds find-skill, links into ~/.claude/bin
+make -C ~/.claude/plugins/marketplaces/dpep install
 export PATH="$HOME/.claude/bin:$PATH"
 ```
 
-To update, `git pull` in the checkout and re-run the make line (the install is
-a symlink, so a plain rebuild also refreshes what's on PATH).
+Working from your own clone instead? `make install` from its root.
+
+To update, `git pull` and re-run the make line — the install is a symlink, so a
+plain rebuild also refreshes what's on PATH.
