@@ -1,0 +1,11 @@
+{
+  "name": "statusbar",
+  "version": "0.2.1",
+  "description": "A compact, configurable Claude Code status line — cwd, branch/PR, session, model, context-window, and rate-limit segments rendered from the session JSON.",
+  "author": {
+    "name": "Daniel Pepper",
+    "url": "https://github.com/dpep"
+  },
+  "homepage": "https://github.com/dpep/claude/tree/main/plugins/statusbar",
+  "license": "MIT"
+}

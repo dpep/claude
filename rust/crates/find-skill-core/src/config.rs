@@ -19,7 +19,7 @@ pub struct Config {
 
 /// Config file path: `$XDG_CONFIG_HOME/claude/find-skill/config.json`.
 pub fn config_path() -> PathBuf {
-    crate::paths::config_dir("find-skill").join("config.json")
+    claude_paths::config_dir("find-skill").join("config.json")
 }
 
 /// Load config. Absent or malformed → an empty config; the user opts

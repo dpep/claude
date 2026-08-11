@@ -31,6 +31,8 @@ install: build
 	@mkdir -p $(CLAUDE_BIN_DIR)
 	@ln -sf "$(CURDIR)/rust/target/release/find-skill" $(CLAUDE_BIN_DIR)/find-skill
 	@echo "linked $(CLAUDE_BIN_DIR)/find-skill -> rust/target/release/find-skill"
+	@ln -sf "$(CURDIR)/rust/target/release/statusbar"  $(CLAUDE_BIN_DIR)/statusbar
+	@echo "linked $(CLAUDE_BIN_DIR)/statusbar  -> rust/target/release/statusbar"
 	@ln -sf "$(CURDIR)/plugins/code/bin/find-gem"      $(CLAUDE_BIN_DIR)/find-gem
 	@echo "linked $(CLAUDE_BIN_DIR)/find-gem   -> plugins/code/bin/find-gem"
 	@command -v find-skill >/dev/null 2>&1 || { \
@@ -40,8 +42,8 @@ install: build
 	}
 
 uninstall:
-	@rm -f $(CLAUDE_BIN_DIR)/find-skill $(CLAUDE_BIN_DIR)/find-gem
-	@echo "unlinked find-skill / find-gem"
+	@rm -f $(CLAUDE_BIN_DIR)/find-skill $(CLAUDE_BIN_DIR)/find-gem $(CLAUDE_BIN_DIR)/statusbar
+	@echo "unlinked find-skill / find-gem / statusbar"
 
 clean: uninstall
 	cd rust && cargo clean

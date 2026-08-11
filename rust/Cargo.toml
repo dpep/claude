@@ -11,7 +11,13 @@
 
 [workspace]
 resolver = "2"
-members = ["crates/find-skill-core", "crates/find-skill-cli"]
+members = [
+  "crates/claude-paths",
+  "crates/find-skill-core",
+  "crates/find-skill-cli",
+  "crates/statusbar-core",
+  "crates/statusbar-cli",
+]
 
 # Shared versions, inherited by members via `dep.workspace = true`, so the
 # whole workspace compiles against one compatible set.

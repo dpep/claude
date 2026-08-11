@@ -14,6 +14,11 @@
       "name": "personas",
       "source": "./plugins/personas",
       "description": "Reusable agent personas — craft & analysis experts (analyst, librarian, rubyist, scribe) and a moderator-chaired decision council (PM, hacker, staff engineer, production engineer, platform expert, skeptic) you can summon in any project. Self-contained system prompts; most critique or do."
+    },
+    {
+      "name": "statusbar",
+      "source": "./plugins/statusbar",
+      "description": "A compact, configurable status line — cwd, git branch/PR, session, model, context-window and rate-limit, rendered from a small Rust binary built in this repo."
     }
   ]
 }

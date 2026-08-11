@@ -1,0 +1,33 @@
+{
+  "separator": " · ",
+  "cwd": {
+    "strip_prefixes": [],
+    "collapse_depth": 3
+  },
+  "branch": {
+    "enabled": true,
+    "strip_prefixes": [],
+    "strip_handle": true,
+    "hide_on": ["main", "master"]
+  },
+  "pr": {
+    "enabled": true,
+    "prefer_over_branch": true
+  },
+  "worktree": true,
+  "session": true,
+  "model": {
+    "enabled": false,
+    "hide": []
+  },
+  "context_window": {
+    "enabled": true,
+    "show_at": 50.0,
+    "warn_at": 80.0
+  },
+  "rate_limit": {
+    "enabled": true,
+    "warn_at": 70.0,
+    "danger_at": 90.0
+  }
+}

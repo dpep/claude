@@ -31,11 +31,11 @@ those two skills have nothing to call:
 brew install dpep/tools/rq dpep/tools/gqls
 ```
 
-`find-skill` and `find-gem` are built and installed from this repo:
+`find-skill`, `find-gem` and `statusbar` are built and installed from this repo:
 
 ```sh
 git clone https://github.com/dpep/claude && cd claude
-make install     # builds rust/, symlinks both into ~/.claude/bin
+make install     # builds rust/, symlinks them into ~/.claude/bin
 ```
 
 Add `~/.claude/bin` to your `PATH`.
@@ -59,6 +59,19 @@ Agents with a point of view:
 
 **A decision council** — `product-manager`, `hacker`, `staff-engineer`,
 `production-engineer`, `platform-expert`, `skeptic`, chaired by a `moderator`.
+
+### `statusbar`
+
+A compact status line: working directory, git branch or PR, session, model,
+context-window use and rate-limit, configurable per segment.
+
+It renders from a small Rust binary and is wired into `settings.json` as a
+`statusLine` command. `/statusbar-install` does the whole thing — fetches or
+builds the binary, writes the settings block, and smoke-tests the render:
+
+```sh
+cargo install --git https://github.com/dpep/claude statusbar-cli   # no clone needed
+```
 
 ## License
 

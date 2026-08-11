@@ -1,0 +1,27 @@
+# statusbar-cli — the `statusbar` binary. Reads Claude Code's session
+# JSON on stdin, resolves the git branch + clock, and prints the ANSI
+# status line via statusbar-core. Installed to ~/.claude/bin/statusbar by
+# `make install`; wired up as a `statusLine` command in settings.json.
+
+[package]
+name = "statusbar-cli"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[[bin]]
+name = "statusbar"
+path = "src/main.rs"
+
+[dependencies]
+statusbar-core = { path = "../statusbar-core" }
+claude-paths = { path = "../claude-paths" }
+clap.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

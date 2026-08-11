@@ -12,7 +12,6 @@ pub mod frontmatter;
 pub mod index;
 pub mod marketplaces;
 pub mod matcher;
-pub mod paths;
 pub mod remote;
 pub mod scan;
 pub mod types;

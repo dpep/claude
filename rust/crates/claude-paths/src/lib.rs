@@ -1,11 +1,13 @@
-//! XDG-style path helpers.
+//! XDG-style path helpers shared by this workspace's binaries.
 //!
 //! `config_dir(tool)` → `$XDG_CONFIG_HOME/claude/<tool>`, else
 //! `~/.config/claude/<tool>`. `cache_dir(tool)` is the same shape under
 //! `$XDG_CACHE_HOME` / `~/.cache`.
 //!
-//! Inlined rather than shared: these are a dozen lines, and depending on a
-//! common crate for them is what kept this tool tied to a private workspace.
+//! Deliberately only these two. They were inlined into find-skill at first —
+//! right for one consumer — and became a crate when statusbar needed them too.
+//! It is not a general "common" crate: the private workspace has one of those,
+//! and depending on it is what kept both tools unpublishable.
 
 use std::env;
 use std::path::PathBuf;

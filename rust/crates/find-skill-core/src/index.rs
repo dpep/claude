@@ -49,7 +49,7 @@ impl Index {
 
 /// Default cache file: `$XDG_CACHE_HOME/claude/find-skill/index.json`.
 pub fn cache_path() -> PathBuf {
-    crate::paths::cache_dir("find-skill").join("index.json")
+    claude_paths::cache_dir("find-skill").join("index.json")
 }
 
 pub fn load(path: &Path) -> Option<Index> {
