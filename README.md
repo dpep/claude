@@ -80,10 +80,6 @@ Agents with a point of view, summonable in any project. Two groups:
 `production-engineer`, `platform-expert`, `skeptic`, chaired by a `moderator`
 that sequences them to avoid anchoring and forces the tradeoffs into the open.
 
-Each is a self-contained system prompt. Most will either critique a plan or do
-the work, so they're useful as reviewers *and* as implementers — a staff
-engineer that only ever has opinions isn't much help.
-
 ## License
 
 MIT — see [LICENSE](LICENSE).
