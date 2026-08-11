@@ -5,7 +5,7 @@ state as JSON to a status-line command every ~10s; statusbar renders it into a
 tidy bar of `·`-joined segments with ANSI color.
 
 ```
-~/code/lib/claude · thicket-api · [review] · ctx:72% · rate:88% (14m)
+~/code/lib/claude · example-api · [review] · ctx:72% · rate:88% (14m)
 ```
 
 ## What it renders

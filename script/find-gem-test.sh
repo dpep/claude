@@ -9,7 +9,7 @@ find_gem="$repo/plugins/code/bin/find-gem"
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 
-gem_dir="$tmp/gems/thicket-1.0.0"
+gem_dir="$tmp/gems/widget-1.0.0"
 mkdir -p "$gem_dir" "$tmp/bin"
 
 cat >"$tmp/bin/bundle" <<EOF
@@ -30,9 +30,9 @@ esac
 # --json; a user's --json after \`--\` must reach us as a plain argument.
 case "\$1" in
   --json)
-    printf '%s\n' '{"type":"begin","data":{"path":{"text":"$gem_dir/lib/thicket.rb"}}}'
-    printf '%s\n' '{"type":"match","data":{"path":{"text":"$gem_dir/lib/thicket.rb"},"lines":{"text":"def plant \"sapling\"\n"},"line_number":7}}'
-    printf '%s\n' '{"type":"match","data":{"path":{"text":"$gem_dir/lib/thicket.rb"},"lines":{"bytes":"AAA="},"line_number":9}}'
+    printf '%s\n' '{"type":"begin","data":{"path":{"text":"$gem_dir/lib/widget.rb"}}}'
+    printf '%s\n' '{"type":"match","data":{"path":{"text":"$gem_dir/lib/widget.rb"},"lines":{"text":"def plant \"sapling\"\n"},"line_number":7}}'
+    printf '%s\n' '{"type":"match","data":{"path":{"text":"$gem_dir/lib/widget.rb"},"lines":{"bytes":"AAA="},"line_number":9}}'
     printf '%s\n' '{"type":"end","data":{}}'
     ;;
   *) printf '%s\n' "rg-args: \$*" ;;
@@ -61,51 +61,51 @@ check() { # check <name> <expected> <actual>
 
 check "locate (text)" \
   "$gem_dir" \
-  "$("$find_gem" thicket)"
+  "$("$find_gem" widget)"
 
 check "locate (--json)" \
-  "{\"gem\":\"thicket\",\"dir\":\"$gem_dir\"}" \
-  "$("$find_gem" thicket --json)"
+  "{\"gem\":\"widget\",\"dir\":\"$gem_dir\"}" \
+  "$("$find_gem" widget --json)"
 
 check "locate (-J is the same single object)" \
-  "$("$find_gem" thicket --json)" \
-  "$("$find_gem" thicket -J)"
+  "$("$find_gem" widget --json)" \
+  "$("$find_gem" widget -J)"
 
 check "search (text mode hands rg the pattern and the gem dir)" \
   "rg-args: --line-number plant $gem_dir" \
-  "$("$find_gem" thicket plant)"
+  "$("$find_gem" widget plant)"
 
 check "search (rg flags pass through untouched)" \
   "rg-args: --line-number -i plant -g *.rb $gem_dir" \
-  "$("$find_gem" thicket -i plant -g '*.rb')"
+  "$("$find_gem" widget -i plant -g '*.rb')"
 
 # `--` is how a dash-leading pattern reaches rg: the reserved flags stop
 # being ours past that point, so the mode stays text.
 check "search (-- hands the rest to rg verbatim)" \
   "rg-args: --line-number -- --json $gem_dir" \
-  "$("$find_gem" thicket -- --json)"
+  "$("$find_gem" widget -- --json)"
 
 check "search (rg's long forms don't collide)" \
   "rg-args: --line-number --threads 4 plant $gem_dir" \
-  "$("$find_gem" thicket --threads 4 plant)"
+  "$("$find_gem" widget --threads 4 plant)"
 
 # Quotes in the matched line must survive as JSON; the non-UTF8 match
 # (bytes rather than text) is dropped rather than emitted half-formed.
-match='{"file":"'"$gem_dir"'/lib/thicket.rb","line":7,"text":"def plant \"sapling\""}'
+match='{"file":"'"$gem_dir"'/lib/widget.rb","line":7,"text":"def plant \"sapling\""}'
 
 check "search (--json array)" \
   "[$match]" \
-  "$("$find_gem" thicket plant --json)"
+  "$("$find_gem" widget plant --json)"
 
 check "search (-J one object per line)" \
   "$match" \
-  "$("$find_gem" thicket plant -J)"
+  "$("$find_gem" widget plant -J)"
 
 # An rg failure must not leave a well-formed "no matches" document on
 # stdout — that's what a JSON consumer would believe.
 check "search (rg failure: no stdout, rg's exit code)" \
   "|2" \
-  "$("$find_gem" thicket BOOM --json 2>/dev/null; echo "|$?")"
+  "$("$find_gem" widget BOOM --json 2>/dev/null; echo "|$?")"
 
 # Help is a successful outcome; a missing gem name is not.
 check "--help prints the whole block and exits 0" \
@@ -118,7 +118,7 @@ check "no arguments is a usage error on stderr" \
 
 check "missing rg is named, not blamed on the gem" \
   "find-gem: rg is not on PATH" \
-  "$(PATH="$tmp/bin-norg:/usr/bin:/bin" "$find_gem" thicket plant 2>&1 >/dev/null)"
+  "$(PATH="$tmp/bin-norg:/usr/bin:/bin" "$find_gem" widget plant 2>&1 >/dev/null)"
 
 # Run from a scratch dir: no Gemfile in cwd, so this exercises the real
 # ruby resolver rather than the stubbed bundle.

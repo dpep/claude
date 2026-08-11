@@ -34,11 +34,11 @@ fn run(home: &Path, cwd: &str, stdin: &str) -> serde_json::Value {
 fn renders_cwd_and_hides_trunk_branch() {
     let home = tempfile::tempdir().unwrap();
     // A non-repo dir → no branch; cwd under HOME collapses to ~.
-    let cwd = home.path().join("rewild");
+    let cwd = home.path().join("projects");
     std::fs::create_dir_all(&cwd).unwrap();
     let payload = format!(r#"{{"workspace": {{"current_dir": "{}"}}}}"#, cwd.display());
     let v = run(home.path(), cwd.to_str().unwrap(), &payload);
-    assert_eq!(v["statusline"], "~/rewild");
+    assert_eq!(v["statusline"], "~/projects");
 }
 
 #[test]

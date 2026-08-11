@@ -149,7 +149,7 @@ fn add_then_paths_shows_registered_dir() {
     let repo = home.path().join("work/proj");
     write(
         &repo.join(".git/config"),
-        "[remote \"origin\"]\n\turl = git@github.com:rewild/proj.git\n",
+        "[remote \"origin\"]\n\turl = git@github.com:projects/proj.git\n",
     );
     write(
         &repo.join("skills/thing/SKILL.md"),
@@ -173,7 +173,7 @@ fn add_then_paths_shows_registered_dir() {
         .unwrap();
     let v: serde_json::Value =
         serde_json::from_str(&String::from_utf8(paths.stdout).unwrap()).unwrap();
-    assert_eq!(v["roots"][0]["remote"], "rewild/proj");
+    assert_eq!(v["roots"][0]["remote"], "projects/proj");
 }
 
 #[test]
@@ -182,7 +182,7 @@ fn reset_clears_config_and_cache() {
     let repo = home.path().join("proj");
     write(
         &repo.join(".git/config"),
-        "[remote \"origin\"]\n\turl = git@github.com:rewild/proj.git\n",
+        "[remote \"origin\"]\n\turl = git@github.com:projects/proj.git\n",
     );
     write(
         &repo.join("skills/thing/SKILL.md"),

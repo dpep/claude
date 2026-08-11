@@ -75,7 +75,7 @@ mod tests {
     fn parses_full_payload() {
         let s = Session::parse(
             r#"{
-              "workspace": {"current_dir": "/home/x/rewild/thicket", "git_worktree": "wt-a"},
+              "workspace": {"current_dir": "/home/x/projects/widget", "git_worktree": "wt-a"},
               "session_name": "review",
               "rate_limits": {"five_hour": {"used_percentage": 82.4, "resets_at": 1000}},
               "context_window": {"used_percentage": 55.0},
@@ -85,7 +85,7 @@ mod tests {
         );
         assert_eq!(
             s.workspace.current_dir.as_deref(),
-            Some("/home/x/rewild/thicket")
+            Some("/home/x/projects/widget")
         );
         assert_eq!(s.session_name.as_deref(), Some("review"));
         assert_eq!(s.pr.unwrap().number, 474);

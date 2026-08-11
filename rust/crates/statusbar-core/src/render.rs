@@ -233,7 +233,7 @@ mod tests {
         Env {
             branch,
             github_handle: None,
-            home: "/home/dpep",
+            home: "/home/x",
             now_unix: 1_000,
         }
     }
@@ -251,14 +251,14 @@ mod tests {
 
     #[test]
     fn cwd_only_on_trunk() {
-        let s = Session::parse(r#"{"workspace": {"current_dir": "/home/dpep/rewild"}}"#);
+        let s = Session::parse(r#"{"workspace": {"current_dir": "/home/x/projects"}}"#);
         let out = plain(&s, &env(Some("main")), &Config::default());
-        assert_eq!(out, "~/rewild");
+        assert_eq!(out, "~/projects");
     }
 
     #[test]
     fn home_collapses_to_tilde_and_deep_path_shortens() {
-        let s = Session::parse(r#"{"workspace": {"current_dir": "/home/dpep/code/lib/claude"}}"#);
+        let s = Session::parse(r#"{"workspace": {"current_dir": "/home/x/code/lib/claude"}}"#);
         let out = plain(&s, &env(None), &Config::default());
         assert_eq!(out, "…/lib/claude");
     }
@@ -268,7 +268,7 @@ mod tests {
         let cfg =
             Config::parse(r#"{"cwd": {"strip_prefixes": ["~/workspace/"], "collapse_depth": 2}}"#);
         let s = Session::parse(
-            r#"{"workspace": {"current_dir": "/home/dpep/workspace/thicket/api/v2"}}"#,
+            r#"{"workspace": {"current_dir": "/home/x/workspace/widget/api/v2"}}"#,
         );
         let out = plain(&s, &env(None), &cfg);
         assert_eq!(out, "…/api/v2");
@@ -277,21 +277,21 @@ mod tests {
     #[test]
     fn branch_shown_with_prefix_trimmed() {
         let cfg = Config::parse(r#"{"branch": {"strip_prefixes": ["dpep/", "dp/"]}}"#);
-        let s = Session::parse(r#"{"workspace": {"current_dir": "/home/dpep/rewild"}}"#);
-        let out = plain(&s, &env(Some("dpep/thicket-api")), &cfg);
-        assert_eq!(out, "~/rewild · thicket-api");
+        let s = Session::parse(r#"{"workspace": {"current_dir": "/home/x/projects"}}"#);
+        let out = plain(&s, &env(Some("dpep/example-api")), &cfg);
+        assert_eq!(out, "~/projects · example-api");
     }
 
     #[test]
     fn handle_stripped_from_branch_by_default() {
         // strip_handle defaults on; the derived handle trims "<handle>/".
-        let s = Session::parse(r#"{"workspace": {"current_dir": "/home/dpep/rewild"}}"#);
+        let s = Session::parse(r#"{"workspace": {"current_dir": "/home/x/projects"}}"#);
         let out = plain(
             &s,
-            &env_with_handle(Some("dpep/thicket-api"), "dpep"),
+            &env_with_handle(Some("dpep/example-api"), "dpep"),
             &Config::default(),
         );
-        assert_eq!(out, "~/rewild · thicket-api");
+        assert_eq!(out, "~/projects · example-api");
     }
 
     #[test]
@@ -457,7 +457,7 @@ mod tests {
         );
         let s = Session::parse(
             r#"{
-              "workspace": {"current_dir": "/home/dpep/rewild", "git_worktree": "wt-a"},
+              "workspace": {"current_dir": "/home/x/projects", "git_worktree": "wt-a"},
               "session_name": "rv",
               "pr": {"number": 474, "review_state": "changes_requested"},
               "model": {"display_name": "Opus"},
@@ -467,7 +467,7 @@ mod tests {
         );
         assert_eq!(
             plain(&s, &env(Some("feat")), &cfg),
-            "~/rewild · wt:wt-a · feat · #474 · [rv] · Opus · ctx:85% · rate:92% (20m)"
+            "~/projects · wt:wt-a · feat · #474 · [rv] · Opus · ctx:85% · rate:92% (20m)"
         );
     }
 

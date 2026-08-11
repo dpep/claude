@@ -96,7 +96,7 @@ mod tests {
         let repo = ws.path().join("proj");
         write(
             &repo.join(".git/config"),
-            "[remote \"origin\"]\n\turl = git@github.com:rewild/proj.git\n",
+            "[remote \"origin\"]\n\turl = git@github.com:projects/proj.git\n",
         );
         write(
             &repo.join(".claude/commands/release.md"),
@@ -105,7 +105,7 @@ mod tests {
 
         let roots = discover(&[ws.path().to_path_buf()]);
         assert_eq!(roots.len(), 1);
-        assert_eq!(roots[0].remote.as_deref(), Some("rewild/proj"));
+        assert_eq!(roots[0].remote.as_deref(), Some("projects/proj"));
     }
 
     #[test]

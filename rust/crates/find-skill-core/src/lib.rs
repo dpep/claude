@@ -374,7 +374,7 @@ mod tests {
         let repo = tmp.path().join("proj");
         write(
             &repo.join(".git/config"),
-            "[remote \"origin\"]\n\turl = git@github.com:rewild/proj.git\n",
+            "[remote \"origin\"]\n\turl = git@github.com:projects/proj.git\n",
         );
         write(
             &repo.join("skills/thing/SKILL.md"),
