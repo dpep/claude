@@ -9,10 +9,9 @@
 
 set -e
 
-# Two install routes put it in different places — `cargo install` in
-# ~/.cargo/bin, `make install` in ~/.claude/bin — so look on PATH first and
-# only then at the symlink. Checking one location would call a working install
-# broken.
+# `make install` symlinks into ~/.claude/bin, but check PATH first: someone
+# building from a dev checkout may have it elsewhere, and a hook that only
+# knows one location calls a working install broken.
 bin="$(command -v statusbar 2>/dev/null || true)"
 [[ -z "$bin" && -x "${HOME}/.claude/bin/statusbar" ]] && bin="${HOME}/.claude/bin/statusbar"
 
@@ -22,7 +21,7 @@ if [[ -z "$bin" || ! -x "$bin" ]]; then
   "systemMessage": "⚠️  statusbar binary is not on PATH. Run /statusbar-install to install it and wire up your status line.",
   "hookSpecificOutput": {
     "hookEventName": "SessionStart",
-    "additionalContext": "The statusbar binary is not on PATH or in ~/.claude/bin, so the custom status line won't render. If the user asks you to fix it: run /statusbar-install, which handles it end to end. The short version: 'cargo install --git https://github.com/dpep/claude statusbar-cli' (no clone needed), then point settings.json statusLine at the installed binary."
+    "additionalContext": "The statusbar binary is not on PATH or in ~/.claude/bin, so the custom status line won't render. If the user asks you to fix it: run /statusbar-install, which handles it end to end. The short version: 'make -C ~/.claude/plugins/marketplaces/dpep install' (a marketplace install clones the whole repo, Makefile included), then point settings.json statusLine at ~/.claude/bin/statusbar."
   }
 }
 EOF
@@ -41,7 +40,7 @@ if [[ -n "$want" && -n "$got" && "$want" != "$got" ]]; then
   "systemMessage": "⚠️  statusbar binary is stale (binary ${got}, plugin ${want}). Run /statusbar-install to rebuild it.",
   "hookSpecificOutput": {
     "hookEventName": "SessionStart",
-    "additionalContext": "The statusbar binary at ${bin} is version ${got} but the plugin ships ${want}, so the status line is running old code. If the user asks you to fix it: run /statusbar-install, which handles it end to end. The short version: 'cargo install --git https://github.com/dpep/claude statusbar-cli' (no clone needed), then point settings.json statusLine at the installed binary."
+    "additionalContext": "The statusbar binary at ${bin} is version ${got} but the plugin ships ${want}, so the status line is running old code. If the user asks you to fix it: run /statusbar-install, which handles it end to end. The short version: 'make -C ~/.claude/plugins/marketplaces/dpep install' (a marketplace install clones the whole repo, Makefile included), then point settings.json statusLine at ~/.claude/bin/statusbar."
   }
 }
 EOF

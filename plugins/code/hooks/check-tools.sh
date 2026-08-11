@@ -19,7 +19,7 @@ set -u
 tools=(
   "rq|find a definition by name|brew install dpep/tools/rq   (or: cargo install reference-query)"
   "gqls|search a GraphQL schema|brew install dpep/tools/gqls   (or: cargo install gqls-cli)"
-  "find-skill|locate where a skill is defined|cargo install --git https://github.com/dpep/claude find-skill-cli"
+  "find-skill|locate where a skill is defined|make -C ~/.claude/plugins/marketplaces/dpep install"
 )
 
 missing=()

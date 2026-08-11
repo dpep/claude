@@ -65,13 +65,10 @@ Agents with a point of view:
 A compact status line: working directory, git branch or PR, session, model,
 context-window use and rate-limit, configurable per segment.
 
-It renders from a small Rust binary and is wired into `settings.json` as a
-`statusLine` command. `/statusbar-install` does the whole thing — fetches or
-builds the binary, writes the settings block, and smoke-tests the render:
-
-```sh
-cargo install --git https://github.com/dpep/claude statusbar-cli   # no clone needed
-```
+It renders from a small Rust binary — the same `make install` that builds
+`find-skill` and `find-gem` — wired into `settings.json` as a `statusLine`
+command. `/statusbar-install` does the whole thing: builds it, writes the
+settings block, and smoke-tests the render.
 
 ### `datasets`
 
