@@ -1,7 +1,6 @@
 # dpep/claude
 
-A small [Claude Code](https://claude.com/claude-code) plugin marketplace: the
-parts of my setup that are useful to someone who isn't me.
+A small [Claude Code](https://claude.com/claude-code) plugin marketplace to accelerate your development.
 
 ```
 /plugin marketplace add dpep/claude
@@ -19,11 +18,11 @@ lookups.
 
 | skill | for |
 |---|---|
-| `git` | branches, PRs, worktrees, rebases |
-| `rq` | find a definition by name, across Ruby/Rust/Go/Python/TypeScript |
+| `git` | branches, PRs, worktrees, rebases, optimizations |
+| `rq` | find code definitions, across Ruby/Rust/Go/Python/TypeScript |
 | `gqls` | search a GraphQL schema by name or meaning, or jump to a resolver |
-| `find-skill` | locate where a skill is defined on disk |
-| `find-gem` | locate and search an installed Ruby gem's source |
+| `find-skill` | locate a Claude skill definition on disk |
+| `find-gem` | locate a Ruby gem's source |
 
 The `rq` and `gqls` skills drive CLIs of the same name — install them first, or
 those two skills have nothing to call:
