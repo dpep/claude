@@ -31,6 +31,12 @@ serde_json = { version = "1", features = ["preserve_order"] }
 tempfile = "3"
 time = { version = "0.3", features = ["macros", "serde", "formatting", "parsing"] }
 
+# Allow-by-default upstream. A `pub` item in a binary crate is unreachable from
+# anywhere, and `pub` is exactly what makes dead_code skip an item — so opting
+# in here is what lets that lint see the CLI crates at all.
+[workspace.lints.rust]
+unreachable_pub = "warn"
+
 [workspace.lints.clippy]
 doc_overindented_list_items = "allow"
 doc_lazy_continuation = "allow"

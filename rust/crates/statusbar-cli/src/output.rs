@@ -5,14 +5,14 @@
 use serde::Serialize;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub enum Mode {
+pub(crate) enum Mode {
     Text,
     Json,
     Ndjson,
 }
 
 impl Mode {
-    pub fn new(json: bool, ndjson: bool) -> Self {
+    pub(crate) fn new(json: bool, ndjson: bool) -> Self {
         if ndjson {
             Mode::Ndjson
         } else if json {
@@ -22,13 +22,13 @@ impl Mode {
         }
     }
 
-    pub fn structured(self) -> bool {
+    pub(crate) fn structured(self) -> bool {
         self != Mode::Text
     }
 }
 
 /// Emit a single object (identical under `--json` and `--ndjson`).
-pub fn emit_one<T: Serialize>(mode: Mode, item: &T) {
+pub(crate) fn emit_one<T: Serialize>(mode: Mode, item: &T) {
     if mode.structured() {
         if let Ok(s) = serde_json::to_string(item) {
             println!("{s}");
