@@ -267,9 +267,8 @@ mod tests {
     fn strip_prefix_then_collapse() {
         let cfg =
             Config::parse(r#"{"cwd": {"strip_prefixes": ["~/workspace/"], "collapse_depth": 2}}"#);
-        let s = Session::parse(
-            r#"{"workspace": {"current_dir": "/home/x/workspace/widget/api/v2"}}"#,
-        );
+        let s =
+            Session::parse(r#"{"workspace": {"current_dir": "/home/x/workspace/widget/api/v2"}}"#);
         let out = plain(&s, &env(None), &cfg);
         assert_eq!(out, "…/api/v2");
     }
