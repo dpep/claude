@@ -16,12 +16,20 @@ bin="$(command -v statusbar 2>/dev/null || true)"
 [[ -z "$bin" && -x "${HOME}/.claude/bin/statusbar" ]] && bin="${HOME}/.claude/bin/statusbar"
 
 if [[ -z "$bin" || ! -x "$bin" ]]; then
+    # A dangling symlink is the common failure — `cargo clean` removes the
+    # target and `command -v` skips what it can't execute. Name that state
+    # rather than blaming PATH, which is still fine.
+    if [[ -L "${HOME}/.claude/bin/statusbar" ]]; then
+        why="The ~/.claude/bin/statusbar symlink is dangling — its build target is gone (usually 'cargo clean'), so nothing executes and the status line renders empty. This says nothing about PATH; a rebuild relinks it."
+    else
+        why="No statusbar binary was found — nothing executable at ~/.claude/bin/statusbar, and nothing named statusbar on PATH — so the custom status line won't render. That is a statement about the search, not about PATH's contents: don't report ~/.claude/bin as missing from PATH without inspecting PATH itself, and note the status line calls an absolute path either way."
+    fi
     cat <<EOF
 {
-  "systemMessage": "⚠️  statusbar binary is not on PATH. Run /statusbar-install to install it and wire up your status line.",
+  "systemMessage": "⚠️  statusbar binary is not runnable. Run /statusbar-install to (re)build it and wire up your status line.",
   "hookSpecificOutput": {
     "hookEventName": "SessionStart",
-    "additionalContext": "The statusbar binary is not on PATH or in ~/.claude/bin, so the custom status line won't render. If the user asks you to fix it: run /statusbar-install, which handles it end to end. The short version: 'make -C ~/.claude/plugins/marketplaces/dpep install' (a marketplace install clones the whole repo, Makefile included), then point settings.json statusLine at ~/.claude/bin/statusbar."
+    "additionalContext": "${why} If the user asks you to fix it: run /statusbar-install, which handles it end to end. The short version: 'make -C ~/.claude/plugins/marketplaces/dpep install' (a marketplace install clones the whole repo, Makefile included), then point settings.json statusLine at ~/.claude/bin/statusbar."
   }
 }
 EOF
