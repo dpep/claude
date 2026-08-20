@@ -1,6 +1,6 @@
 {
   "name": "code",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "description": "Programming workflow & code-navigation skills: git (branches, PRs, worktrees), rq (find a definition by name), gqls (search a GraphQL schema \u2014 fuzzy/semantic, or jump to a resolver), find-gem (locate + search installed Ruby gem source). Will grow to review, testing, and language patterns.",
   "author": {
     "name": "Daniel Pepper",
