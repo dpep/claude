@@ -79,7 +79,39 @@ Every optimization ships with an equivalence check. In practice this means a fix
 
 The discipline pays twice: it catches the subtle break, and it makes the win reportable. "19.7ms → 5.6ms per call, output identical: recall 72.0%, precision 95.1%" is a claim someone can act on.
 
-## 8. Know the budget, and stop when you're inside it
+## 8. The fix has a price the profile can't show you
+
+A speedup is denominated in milliseconds; its cost is denominated in how hard the code is to change next year. They never appear on the same ledger, so the win gets booked and the price gets discovered by someone else.
+
+Two questions keep it honest:
+
+**Is the new seam drawn by meaning, or by cost?** One proposal split a scoring function in half so the cheap half could run before the expensive data was loaded. The boundary was real — it just fell exactly where the storage happened to get expensive, which is not a fact about the domain. A seam justified only by what the database charges reads as arbitrary the moment the storage changes.
+
+**What does the fix tax, and how often is that taxed thing edited?** In the same case, the split would have made adding a ranking signal a two-step operation: decide which half your signal belongs to, and if it needs a field the cheap half lacks, either widen the cheap half — erasing the win — or give up the early exit. Four signals had been added that week. The refactor would have charged a toll on the single highest-traffic edit in the codebase, forever, to save six milliseconds inside an existing budget. Refused on architecture, not on effort.
+
+The reflex worth building: **look for the version that keeps the seam.** It is often available and usually smaller — share the repeated string, borrow instead of clone, reuse the buffer. If the contained version gets most of the win, the invasive one needed a much better argument than it had.
+
+## 9. Rust and SQL notes
+
+The structural costs from §1 have a small number of recurring shapes. These are the ones worth recognising on sight.
+
+**Rust**
+
+- **`Vec` + binary search over `HashMap`** for a lookup built once and read many times. Hashing 100k keys dominates; a sorted `Vec` was 36× cheaper to *build* and fast enough to read. `HashMap` wins when you mutate, not when you load a table and query it.
+- **`Arc<str>` (or an interned handle) for low-cardinality repeats.** Cloning an `Arc` bumps a refcount instead of copying bytes, so 8,000 rows sharing one repository name cost one allocation rather than 8,000. Reach for it when the same few values repeat across many records. (`Rc` is the cheaper single-threaded version; `Arc` is the one that crosses threads.)
+- **`Cow<str>` when a transform is usually a no-op.** Lowercasing an already-lowercase string allocates a copy of something identical. Borrow when there's nothing to change.
+- **Borrow in the filter, clone for the survivors.** A hot loop that consumes its input pays for every candidate; one that borrows and clones only what escapes pays for the few percent that do.
+- **Hoist the buffer out of the loop.** Allocating a scratch row per iteration is invisible in the code and dominant in the profile.
+- **Gate above the allocation.** See §6 — a guard placed after the work it was meant to avoid saves nothing at all.
+
+**SQL (SQLite especially)**
+
+- **`LIKE 'x%'` does not use an index** unless the index collation matches the operator's case sensitivity. Case-insensitive `LIKE` against a `BINARY` index scans every row. Use a range comparison — `col >= 'x' AND col < 'x\u{10FFFF}'` — which seeks, and which is also exact, since `_` is a `LIKE` wildcard.
+- **Filter the small table first, then seek the large one.** Testing a predicate on a joined column while scanning the big table cost 29 ms; narrowing on the 3,000-row table and seeking its children cost 0.4 ms, same rows.
+- **`EXPLAIN QUERY PLAN`, on the real statement.** `SCAN` versus `SEARCH` is the whole tell. Run it on the query the code actually issues — a simplified version without the joins plans differently and will mislead you.
+- **A leading `%` can never use an index.** Don't optimize the pattern; reduce what it runs against.
+
+## 10. Know the budget, and stop when you're inside it
 
 "Fast enough" is a number. For a hook that runs on every keystroke it is single-digit milliseconds; for a batch job it may be minutes. Without it, optimization has no terminating condition and the work continues until someone gets bored.
 
