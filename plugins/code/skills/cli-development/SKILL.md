@@ -80,14 +80,28 @@ a stream. For a request/response tool `-J` is just a compact format and there
 is nothing to get wrong. A format that collects
 everything and prints at EOF is line-*shaped*, not a pipe, and the bytes are
 identical either way — only the timing differs, which is why it survives
-review. `tail -f log | tool -J` prints nothing. Two things, and neither alone
-suffices: emit each result as it is produced, and **flush**. Rust, Go, and C
-all block-buffer stdout when it is a pipe rather than a terminal, so a prompt
-write sits in an 8K buffer until the buffer fills. `-j` deliberately cannot do
-this — a pretty array is a single document — which is exactly why both formats
-exist; say so where they are documented, or the asymmetry reads as an
-oversight. The test asserts *timing*, not bytes: write one line, leave stdin
-open, and require output before EOF.
+review. `tail -f log | tool -J` prints nothing.
+
+The cause is almost always **control flow, not buffering** — results collected
+into a vector and rendered after the loop, or input drained to EOF before any
+work starts. Both bugs were in our tools and both looked like buffering. Fix
+the shape: read lazily, emit per item.
+
+Buffering is the second-order problem, and language-dependent. Rust's `stdout`
+is a `LineWriter`, so `println!` reaches a pipe on every newline; C stdio and
+Python block-buffer into an 8K buffer when stdout is not a tty. The Rust trap
+is the *optimization* — wrapping stdout in a `BufWriter` for speed silently
+converts line buffering into block buffering. Check, rather than assume, which
+you have; an explicit flush is cheap insurance either way.
+
+`-j` deliberately cannot stream — a pretty array is a single document — which
+is exactly why both formats exist; say so where they are documented, or the
+asymmetry reads as an oversight.
+
+**The test asserts timing, not bytes**: write one item, leave stdin open, and
+require output before EOF. Nothing else catches this, because the output is
+byte-identical either way — which is how it survives review, and how it sat in
+two of our tools for months.
 
 ## Where its data lives
 
