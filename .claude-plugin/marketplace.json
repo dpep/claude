@@ -13,7 +13,7 @@
     {
       "name": "personas",
       "source": "./plugins/personas",
-      "description": "Reusable agent personas — craft & analysis experts (analyst, librarian, rubyist, scribe) and a moderator-chaired decision council (PM, hacker, staff engineer, production engineer, platform expert, skeptic) you can summon in any project. Self-contained system prompts; most critique or do."
+      "description": "Reusable agent personas — craft & analysis experts (analyst, librarian, rubyist, scribe) and a moderator-chaired decision council (PM, hacker, staff engineer, production engineer, performance engineer, platform expert, skeptic) you can summon in any project. Self-contained system prompts; most critique or do."
     },
     {
       "name": "statusbar",
