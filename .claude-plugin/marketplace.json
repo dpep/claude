@@ -8,7 +8,7 @@
     {
       "name": "code",
       "source": "./plugins/code",
-      "description": "Programming workflow & code-navigation skills: git (branches, PRs, worktrees), rq (find a definition by name), gqls (search a GraphQL schema — fuzzy/semantic, or jump to a resolver), find-skill (locate where a skill is defined), find-gem (locate + search installed Ruby gem source), rwr (structural search and rewrite for Ruby), and cli-development (house conventions for getting a CLI production-ready)."
+      "description": "Programming workflow & code-navigation skills: git (branches, PRs, worktrees), rq (find a definition by name), gqls (search a GraphQL schema — fuzzy/semantic, or jump to a resolver), find-skill (locate where a skill is defined), find-gem (locate + search installed Ruby gem source), and cli-development (house conventions for getting a CLI production-ready)."
     },
     {
       "name": "personas",
