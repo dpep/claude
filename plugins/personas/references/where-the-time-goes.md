@@ -26,6 +26,8 @@ In one case the named phases summed to 18ms of a 53ms run. The remaining 35ms wa
 
 Counters deserve equal weight with timings. *"307,485 candidates scanned to produce 3 suggestions"* diagnoses the problem in a way no duration does.
 
+Pair every timing with what it returned, because **the pass that returns nothing can be the expensive one** and a duration alone will never say so. One query pipeline had a stage costing a flat 5ms on every call that contributed *zero rows* to every query measured. It was invisible in the total and obvious the moment the counter sat next to the timer.
+
 ## 3. Measure the slope, not the total
 
 A total conflates fixed and variable cost, and they want different fixes.
@@ -41,11 +43,15 @@ Run the workload with 0, 1, 3, and 6 of whatever scales, and read it:
 
 That single table says: there is a 12ms floor worth attacking separately, and a 5.6ms per-unit cost worth attacking differently. Neither is visible in "the run took 47ms".
 
-## 4. Contention makes measurements fiction
+## 4. The environment is part of the measurement
 
-A number taken while something else runs is not a number. The specific failure that cost the most: killing a script left its `xargs` workers alive, so the next run put two sets of readers on the same files. The symptom was a load average of 19 on eight cores with **every process at 0% CPU** — everything apparently slow, nothing actually progressing.
+A number is only comparable to another number taken the same way. Three ways that quietly breaks:
 
-Before trusting any timing: reap strays, check the load average, re-measure. A stage that "takes minutes" often takes seconds alone.
+**Contention.** A number taken while something else runs is not a number. The failure that cost the most: killing a script left its `xargs` workers alive, so the next run put two sets of readers on the same files. The symptom was a load average of 19 on eight cores with **every process at 0% CPU** — everything apparently slow, nothing actually progressing. Reap strays, check the load average, re-measure. A stage that "takes minutes" often takes seconds alone.
+
+**Build profile.** A debug build and a release build differ by ~10× on allocation-heavy code, which is most code that matters here. One project compared a debug measurement against a release baseline taken the same morning, concluded a 5× per-candidate regression had shipped, and published that in a changelog. Measured like for like, both release, the two versions were 5-6ms and 7ms — there was no regression at all. **Whenever two numbers disagree, check they came from the same profile before believing the difference.** "Measured today" is not enough; it has to be measured the same way.
+
+**Cache warmth.** The first run touches cold pages and can read 10× high. One per-phase breakdown showed a pass at 50ms that was really 5.5ms warm — and it was not even the pass worth attacking. Run the workload two or three times and read the steady-state number, or you will optimize whichever phase happened to fault first.
 
 ## 5. Price the fancy fix before building it
 
@@ -57,13 +63,23 @@ Two minutes of measurement settled it: *a `Vec` is 36× cheaper to build than a 
 
 **Record the rejection.** "Considered, measured, rejected because construction dominates the common case" is worth more than silence, because otherwise the same clever idea returns every few months with the same confidence.
 
-## 6. A speedup that changes the output is not a speedup
+## 6. When the fix changes nothing, suspect the fix
+
+A change that produces no measurable difference has two explanations, and the flattering one — "my hypothesis was wrong" — is the second thing to check, not the first.
+
+**Did it land?** An edit script that asserts partway through can discard its own writes; a build can fail silently in a piped grep. The tell in one case was a stray "unused function" warning next to a number that refused to move: the helper had been added and the call site it was meant for had not. Confirm the change is in the binary you are timing before drawing any conclusion from it.
+
+**Is it where you think?** A cheap guard only saves what it sits above. One "cheap prefilter", added specifically to avoid a per-candidate allocation, was placed *after* the allocation and bought exactly nothing — for two rounds of measurement, because the reasoning was sound and only the position was wrong. **A gate below an allocation is not a gate.**
+
+And when a plan or a benchmark is the evidence, run it on the *real* statement. A query plan taken on a simplified `SELECT id FROM t WHERE ...` said one thing; the actual query, with its joins, planned differently. The simplification was the bug.
+
+## 7. A speedup that changes the output is not a speedup
 
 Every optimization ships with an equivalence check. In practice this means a fixed corpus and a fixed set of metrics run before and after, with the expectation that they are *identical* — not "close", identical, unless the change was supposed to alter behaviour.
 
 The discipline pays twice: it catches the subtle break, and it makes the win reportable. "19.7ms → 5.6ms per call, output identical: recall 72.0%, precision 95.1%" is a claim someone can act on.
 
-## 7. Know the budget, and stop when you're inside it
+## 8. Know the budget, and stop when you're inside it
 
 "Fast enough" is a number. For a hook that runs on every keystroke it is single-digit milliseconds; for a batch job it may be minutes. Without it, optimization has no terminating condition and the work continues until someone gets bored.
 
