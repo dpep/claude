@@ -1,6 +1,6 @@
 {
   "name": "personas",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "A home for reusable agent personas \u2014 craft & analysis experts (analyst, librarian, rubyist, scribe) and a moderator-chaired decision council (PM, hacker, staff engineer, production engineer, platform expert, skeptic) you can summon in any project. Each is a self-contained system prompt; most work in two modes \u2014 critique or do.",
   "author": {
     "name": "Daniel Pepper",
