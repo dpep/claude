@@ -176,6 +176,71 @@ Watch for the inverse trap: if the tool takes free text as a positional
 argument, `tool status` may *silently succeed* by treating `status` as input. A
 command that does not exist should never report success.
 
+Help drifts, and only a test notices. Assert that every subcommand appears in
+`--help` — one that exists but isn't listed is one nobody finds. Then pull the
+example lines out of your after-help block and run them back through the
+parser: the examples you wrote three releases ago should still be valid syntax.
+It is the in-binary version of running every README example, and it costs one
+test.
+
+## Completion is a flag, it runs before your data exists, and it drifts
+
+`--completions [SHELL]`, not a `completion` subcommand: it is meta-output about
+the tool, like `--version`, rather than a verb the tool performs — and a
+subcommand squats in the noun-space the tool's own vocabulary needs (`ae
+completion` reads like it completes acronyms). Default the shell to `$SHELL` so
+a human can run it bare; still take it as an argument, because packaging asks
+for each shell by name.
+
+Two rules you only learn by breaking them:
+
+**Nothing but the script may reach stdout.** People `eval "$(tool --completions
+zsh)"` from a shell rc, so a stray log line, warning, or progress bar gets
+executed at their login. Emit the script, exit 0, put everything else on stderr.
+
+**It must work with no data, no config, and no network.** Homebrew runs it in a
+clean sandbox at install time, so if generating completions opens the database,
+loads a model, or migrates a schema, the *install* fails — on a machine where
+none of that exists yet. Generate from the parser and nothing else.
+
+Wire the packaging in the same change:
+
+```ruby
+generate_completions_from_executable(bin/"tool", "--completions", shells: [:bash, :zsh, :fish])
+```
+
+Brew literally runs `tool --completions bash`, which is a cross-repo coupling
+with nothing holding it together: rename the flag, or stop defaulting an
+argument, and the *formula* breaks — in another repository, at install time,
+for someone else. Pin it:
+
+- each shell emits a non-empty script carrying that shell's marker (`complete
+  -F`, `compdef`, `complete -c`)
+- the bare form honors `$SHELL`, and an unset or unrecognized one fails
+  usefully instead of panicking
+- the invocation the formula uses is a test case, verbatim
+- `brew test` asserts it post-install — a broken completion script fails
+  silently, as "tab does nothing", which nobody reports as a bug
+
+**Static completion is free; value completion is the point and isn't.**
+`clap_complete` derives flags and subcommands from the parser for nothing, and
+that generated floor never drifts. What people actually want is the *argument*
+completed — `ae define <TAB>` offering acronyms it already knows. That needs a
+hidden subcommand printing candidates one per line plus a shell function that
+calls it, and *that* drifts, because now a human wrote something. Worth it when
+the argument is drawn from a set the tool knows and the user doesn't; skip it
+for paths, where the shell is already better at this than you are.
+
+**It is for humans.** Agents do not press tab, so completion never substitutes
+for help that answers the question or output that parses. It earns its place on
+the human side of a tool that has both.
+
+The house is not currently consistent, which is the argument for writing it
+down: `rq`, `gqls` and `vocab` take the flag (vocab's optional argument is the
+shape to copy), `contextdb` and `iriq` took a subcommand, `rwr` depends on
+`clap_complete` while exposing neither, and `ae`, `inception` and `navi` have
+none. Converge when you next touch one.
+
 ## Before it ships
 
 - **Run every example in the README** and diff against actual output — they
