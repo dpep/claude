@@ -45,6 +45,33 @@ Logging, progress, warnings, and telemetry go to stderr through a logger, never
 `println!`. The test is whether `tool … | jq` works while `-v` is on.
 `--profile` is held to the same rule, so a profiled run still pipes cleanly.
 
+**A process that detaches needs a file, or it has no voice at all.** Send a
+daemon's stderr to `/dev/null` and it cannot be debugged at any verbosity, from
+anywhere: the caller's `-v`, `RUST_LOG` and `RUST_BACKTRACE` are all still set,
+still inherited, and still going nowhere. Put it beside whatever the process is
+named by — the socket, the pidfile — and name that path in the error the caller
+*does* see, because "it exited" is not a diagnosis.
+
+Four things decide whether that file is worth having:
+
+- **Append, don't truncate.** A crash loop is what the log is most needed for,
+  and truncating per start erases it on the way in. One file, many lives — so
+  each run must name its version and pid as it starts, or the file is a blur.
+- **Cap it, and keep enforcing the cap.** Checking only at startup bounds a
+  crash loop but not a long life: at debug level a watchdog thread can log twice
+  a second, and nothing ever re-checks. Trim on a timer the process already has.
+  Keep the *newest* half — during a loop the oldest lines are the least
+  interesting — and resume at a line boundary so the first entry isn't a
+  fragment. Trimming under a live writer is safe when it holds the file
+  `O_APPEND`: the next line goes to the end of whatever is there now.
+- **Default it, then make it configurable** the way every other knob is, and put
+  a floor on it. A cap below one entry turns every write into a rewrite.
+- **Log routine events routinely.** The first thing reading a new log will show
+  you is what you got wrong about it: ours logged `WARN connection error` for
+  every liveness probe — connect, see an answer, drop — which is once per call
+  in the workload that produced 500 a day. A log that is mostly warnings about
+  nothing is one you stop reading, which is worse than not having it.
+
 ## Exit codes should mean something
 
 Pick the convention that matches the command's *job*, and document it:
@@ -131,6 +158,13 @@ hunting for a directory to delete:
 | `--clear-cache` | drop derived data, keep the real data |
 | `--drop` | remove everything, for starting over |
 | `--status` | what exists, how big, how stale |
+
+Where the tool has a fast path and a slow fallback, **`--status` must be able to
+tell you which one is actually being used.** A client that quietly gives up on a
+warm daemon and loads its own copy of a model is ten times the memory and
+invisible from outside — no flag, no log line, nothing. A count of work served,
+checked against how often the caller thinks it ran, is the whole diagnosis; the
+mismatch is the signal, so don't inflate it with probes and status calls.
 
 `--status` doubles as the **health check**: read-only, non-zero when something
 is wrong, so it drops into a container probe or a `&&` chain. Have it report
