@@ -1,6 +1,6 @@
 ---
 name: gqls
-description: Search a GraphQL schema, and draft operations against it, with the `gqls` CLI. Use for "where is the X type/field", "what mutation does Y", "what returns Z", "what fields does Z have" (`gqls User.`), or finding a record by meaning rather than name ("cancel a subscription"); `--example` drafts a query or mutation to paste, and `--resolve` jumps to a field's graphql-ruby resolver. Works against an SDL file, an introspection JSON dump, or a live endpoint. Prefer over grep/rg for anything schema-shaped — it ranks the intended match first and handles camelCase/snake_case/typos. Not for raw text search.
+description: Search a GraphQL schema, and draft operations against it, with the `gqls` CLI. Use for "where is the X type/field", "what mutation does Y", "what returns Z", "what fields does Z have" (`gqls User`), or finding a record by meaning rather than name ("cancel a subscription"); `--example` drafts a query or mutation to paste, and `--resolve` jumps to a field's graphql-ruby resolver. Works against an SDL file, an introspection JSON dump, or a live endpoint. Prefer over grep/rg for anything schema-shaped — it ranks the intended match first and handles camelCase/snake_case/typos. Not for raw text search.
 ---
 
 # gqls — search a GraphQL schema
@@ -62,10 +62,16 @@ rather than a shortlist:
 
 - `match` — `"exact"`, or `"corrected"` when the name was a small misspelling
 - `values` — an enum's values, each `{name, description?, deprecated?}`
-- `fields` — an input object's fields, each `{name, type, default?,
-  description?, deprecated?}`. The `!` in `type` says which must be supplied —
-  unless there's a `default`, which is what makes even a non-null field
-  optional (`direction: OrderDirection! = ASC` may be omitted)
+- `fields` — the fields of an object, an interface or an input object, each
+  `{name, args?, type, default?, description?, deprecated?}`. The `!` in `type`
+  says which must be supplied — unless there's a `default`, which is what makes
+  even a non-null field optional (`direction: OrderDirection! = ASC` may be
+  omitted). Never elided in JSON; the text form stops at a couple of dozen and
+  prints the command that lists the rest
+- `arguments` — a field's arguments with what each is *for*, when the schema
+  documents any of them, each `{name, type, default?, description?}`. The
+  signature says what to pass; this is the half it can't carry, and it's the
+  first thing to check before guessing what a required argument wants
 - `referenced_by` — every path whose type is this one, which is the schema's
   answer to "how do I get one of these". Both directions: a field returning the
   type, and an argument taking it (`Mutation.createUser(input:)`). An input
@@ -77,7 +83,13 @@ that ignores the extra keys still works.
 
 Text output shows the description too — elided to one line in a list, in full
 for a record you named. `-D` drops descriptions, collapses an enum's values to
-their names, and empties the description column of an input object's fields.
+their names, and empties the description column of a type's fields.
+
+**Naming a type is how you list its fields** — `gqls User`, not `gqls User.`.
+The wildcard form is a ranked search that stops at `-l` and can drop fields
+without the answer looking incomplete; naming the type lists them in schema
+order with types, descriptions and deprecations. Keep `User.` for when you want
+to *search* within a type (`gqls 'User.*email*'`).
 
 ## Scope when you know more
 
@@ -97,7 +109,9 @@ their names, and empties the description column of an input object's fields.
 - Return type: `gqls --returns Company` finds fields returning Company even
   when the name doesn't say so (`Query.myEmployer: Company`), ignoring
   `[]`/`!` wrappers; wildcards allowed (`--returns '*Payload'`). Add
-  `-k query` to find an entry point into a type. No QUERY needed — it lists
+  `-k query` to find an entry point into a type. When nothing returns the type
+  outright — an interface, usually — the filter widens to what does reach it
+  and says so on stderr, rather than answering nothing. No QUERY needed — it lists
   every match. This is the way to answer "what returns X", which a name
   search cannot.
 - Kind: `gqls createUser -k mutation` — object, field, query, mutation, enum,
@@ -158,7 +172,10 @@ gqls schema.graphql -J < questions.txt
 Each row carries the `query` that produced it, so one stream stays
 attributable, and a query that matched nothing still reports
 `{"query": …, "status": "no_matches"}` rather than dropping out. A single
-query's output is unchanged, so existing parsing is unaffected. An explicit
+query's output is unchanged, so existing parsing is unaffected. A piped query
+that names one record explains it, the same as one typed as an argument —
+so a batch is a way to ask for several explanations at once, not a weaker
+mode. An explicit
 query beats a pipe; `-R` and `-e` take one query only.
 
 ## Draft a query to paste (`-e`)
@@ -175,12 +192,19 @@ gqls Query.user -e --depth 2             # expand one more level of fields
 Each argument you must supply becomes a variable, with a `"<ID!>"` placeholder
 that names its type. Anything the server can supply — nullable, or carrying a
 schema default — is left out of the operation and listed underneath, so what
-it prints runs as-is. It selects one level of leaf fields, expands an `errors`
-block only when the payload really has one, and wraps a nested field in a root
-that returns its type. Object-valued fields become `# field: Type { … }`
+it prints runs as-is. An `# arguments:` block carries what the schema says each
+argument is for, when it says anything. It selects one level of leaf fields,
+expands an `errors` block only when the payload really has one, and nests a
+field through the chain of fields that reaches it — one hop where a root
+returns its type, and as many as it takes where a schema namespaces its roots
+(`Query.payroll: PayrollQueries`, with the real fields hanging off that), up to
+six. The chain is reported as `Query.payroll > PayrollQueries.company`; past six
+hops, and for a type nothing reaches, `-e` says so and names the distance rather
+than guessing. Object-valued fields become `# field: Type { … }`
 markers — `--depth N` expands them when you want more. A union is written as
 inline fragments over its members (an interface adds one per implementor for
-the fields it adds), and deprecated fields stay in the selection
+the fields it adds, aliased by member where two of them type the same field
+differently), and deprecated fields stay in the selection
 marked `# deprecated: reason` with a stderr warning naming them (tell the user
 rather than pasting one silently). The `# variables` block is a fillable
 skeleton: an input-object argument is expanded into its fields in schema order,
@@ -189,10 +213,18 @@ expanded key no longer states (`# variables — input: CreateUserInput!`). Enums
 are the one thing JSON can't express, so their values are listed under
 `# enums:`.
 
+Name a **type** and `-e` drafts the chain that fetches one, narrowed to it
+where the last hop returns something broader: `gqls Cat -e` against a schema whose
+only path is `Query.pets: [Animal!]!` gives you `pets { ... on Cat { … } }`. An
+enum or a scalar can't be selected by any operation, and says so pointing at
+`--returns` — the question that does have an answer. Don't reach for `-e` to
+see what's *in* a type either; naming it plainly lists its fields.
+
 Name an **input object** and `-e` drafts through the field that takes it —
 an input is never callable but always passable, so `gqls PostFilter -e` gives
 you `Query.posts(filter: $filter)`, with any other field taking one listed under
-`# paths`. An input *field* (`CreateUserInput.email`) drafts through its
+`# paths` — carrying the whole way in when the field taking it is itself
+several hops out. An input *field* (`CreateUserInput.email`) drafts through its
 enclosing input. The argument carrying it is supplied even where the schema
 calls it optional, since a draft that omits it answers nothing. Such a draft
 stays about the input: the reply gets the barest selection a server accepts and
@@ -214,8 +246,9 @@ Two things still need your judgment:
   picks the one with the fewest required arguments; in a federated schema
   another path may be the right one. Ask the user rather than silently
   accepting the pick.
-- **Unreachable fields.** If it reports no root returns the type, don't invent
-  a path — run `gqls --returns <Type>` and show what actually exists.
+- **Unreachable fields.** A field on a type nothing reaches is an error, not a
+  guess. It fires only when the type can't be narrowed to from anything either,
+  so don't invent a path — run `gqls --returns <Type>` and show what exists.
 
 ## Jump to the resolver (graphql-ruby)
 
