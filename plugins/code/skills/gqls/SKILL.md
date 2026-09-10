@@ -106,6 +106,10 @@ to *search* within a type (`gqls 'User.*email*'`).
   shell would expand `*`/`?`/`{}` first. `*`/`?` span `.`, patterns are
   anchored, and semantic ranking is skipped: this enumerates, it doesn't
   search.
+- Argument name: `gqls followRenames` finds the field that *takes* that
+  argument — an argument is not a record of its own, so the field is the
+  answer, and naming it then shows what the argument is for. Ranked below
+  every name and path match, so it only surfaces when nothing else matched.
 - Return type: `gqls --returns Company` finds fields returning Company even
   when the name doesn't say so (`Query.myEmployer: Company`), ignoring
   `[]`/`!` wrappers; wildcards allowed (`--returns '*Payload'`). Add
@@ -225,7 +229,9 @@ an input is never callable but always passable, so `gqls PostFilter -e` gives
 you `Query.posts(filter: $filter)`, with any other field taking one listed under
 `# paths` — carrying the whole way in when the field taking it is itself
 several hops out. An input *field* (`CreateUserInput.email`) drafts through its
-enclosing input. The argument carrying it is supplied even where the schema
+enclosing input, and an input nothing takes drafts through the input that
+holds it — you get the outer one's operation with yours expanded inside the
+variables block, and a stderr line naming the carrier. The argument carrying it is supplied even where the schema
 calls it optional, since a draft that omits it answers nothing. Such a draft
 stays about the input: the reply gets the barest selection a server accepts and
 only that input's own types are expanded, with `--depth 1` asking the payload
