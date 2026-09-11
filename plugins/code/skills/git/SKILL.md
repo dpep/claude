@@ -103,6 +103,12 @@ EOF
 - Keep changes small and focused
 - Prefix with JIRA ticket if applicable: `[PROJ-123] Fix thing`
 - After creating, open in browser: `open <pr_url>`
+- **Link every method/class/file mentioned in the description** — a bare name
+  reads fine but doesn't let the reviewer jump to it. Use a permalink pinned to
+  a real commit, not `main` (which drifts): `https://github.com/<org>/<repo>/blob/{short_sha}/{path}#L{line}`.
+  Do this in the same pass as writing the body — it's easy to draft prose first
+  and mean to add links "after," then forget once the PR is open. If a caller
+  list is short enough to name-check individually, link each one.
 
 ### Updating PRs with Upstream
 
