@@ -20,7 +20,7 @@ lookups.
 
 | skill | for |
 |---|---|
-| `git` | branches, PRs, worktrees, rebases, optimizations |
+| `git` | branches, commits, worktrees, rebases, optimizations |
 | `rq` | find code definitions, across Ruby/Rust/Go/Python/TypeScript/JavaScript |
 | `gqls` | search a GraphQL schema by name or meaning, or jump to a resolver |
 | `find-skill` | locate a Claude skill definition on disk |

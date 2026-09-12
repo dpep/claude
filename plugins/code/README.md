@@ -11,7 +11,7 @@ Programming workflow & code-navigation skills. No hooks; the `rq` and `gqls` ski
 
 ## Skills
 
-- **git** — branching, PRs, rebasing, repo optimization. Subskill: `optimize` (pack consolidation, branch cleanup, fetch refspec narrowing). Reference: `worktrees` (multi-agent coordination, load on demand).
+- **git** — branching, commits, rebasing, repo optimization. Subskill: `optimize` (pack consolidation, branch cleanup, fetch refspec narrowing). Reference: `worktrees` (multi-agent coordination, load on demand).
 - **rq** — find where a symbol is defined via the `rq` CLI; ranks the most-likely
   definition first (prefer over grep/rg for "where is X defined"). Includes
   binary install/update guidance (`brew install dpep/tools/rq`).
