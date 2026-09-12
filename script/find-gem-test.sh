@@ -4,7 +4,7 @@
 # actually searched. `ruby` is the real one — find-gem depends on it.
 set -uo pipefail
 
-repo=$(cd "$(dirname "$0")/.." && pwd)
+repo=$(CDPATH= cd "$(dirname "$0")/.." && pwd)
 find_gem="$repo/plugins/code/bin/find-gem"
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
