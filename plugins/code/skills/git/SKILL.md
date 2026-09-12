@@ -20,7 +20,7 @@ one stops at the push.
 
 ## Subskills
 
-- [optimize](./optimize.md) - Pack consolidation, branch cleanup, fetch refspec narrowing
+- [optimize](./optimize.md) - Pack consolidation, worktree + branch cleanup, fetch refspec narrowing
 
 ## References
 

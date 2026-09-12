@@ -1,7 +1,8 @@
 # Git Optimize Subskill
 
-Run this when git feels slow or branches are stale. Covers pack consolidation,
-branch cleanup, and fetch refspec narrowing.
+Run this when git feels slow, disk is filling, or branches and worktrees are
+stale. Covers pack consolidation, worktree and branch cleanup, and fetch refspec
+narrowing.
 
 ## 1. Sync main
 
@@ -173,7 +174,107 @@ config is `false` — escalate to `kill -9 <PID>`. fsmonitor is a per-repo speed
 safe to leave disabled on small ones. To sweep orphaned daemons across all repos:
 `pgrep -fl fsmonitor--daemon`, then kill the ones whose repos don't need it.
 
-## 5. Prune Stale Branches
+## 5. Garbage-Collect Worktrees
+
+Parallel background agents leave worktrees behind, and every one is a full
+checkout — a dozen abandoned ones will fill a disk while `.git` itself looks
+fine. Do this **before** step 6: `git branch -D` refuses a branch that is still
+checked out in a worktree.
+
+Removing worktrees reclaims *working-tree* bytes only. They share one object DB,
+so a bloated `.git` is step 3's problem, not this one — check both before
+concluding which is eating the disk.
+
+```bash
+git worktree list --porcelain     # path, HEAD, branch, and bare/detached/locked/prunable
+du -sh <path> <path> …            # one call, all the paths — where the bytes actually are
+```
+
+Start with the free win — records whose directory is already gone:
+
+```bash
+git worktree prune -v --dry-run
+git worktree prune -v
+```
+
+That only drops administrative records; it never reclaims disk for a worktree
+that still exists. Its `--expire <time>` is no shortcut either — it bounds which
+*missing* worktrees get pruned, and ignores live ones however old. The rest need
+classifying.
+
+### Classify each remaining worktree
+
+Skip two that are never candidates: the **primary** worktree (first in the list,
+the repo root) and the one you are **currently running in**.
+
+For each of the others, gather the age and the two containment refs:
+
+```bash
+git -C <wt> log -1 --format=%ct                 # last commit, epoch seconds
+git -C <wt> status --porcelain                  # any output = dirty
+git -C <wt> rev-parse HEAD
+git -C <wt> rev-parse --verify -q origin/<branch>   # exit 1, no output = no remote branch
+gh pr list --head <branch> --state all --json number,state,headRefOid
+```
+
+**Stale = no commit for two weeks.** That is the whole test, and it only asks one
+question: is anyone still using this worktree. Treat the threshold as a dial, not
+a law — say which one you used.
+
+Staleness makes a worktree a *candidate*. What decides how you remove it is
+whether its work exists anywhere else:
+
+| Is local `HEAD` contained off-machine, tree clean? | Action |
+| --- | --- |
+| Yes — in a PR head or in `origin/<branch>` | remove; nothing is lost |
+| No | **confirm**, and offer to push it somewhere first |
+
+**Containment is about reconstructability, not merge status.** Both refs count and
+for the same reason — the commits survive the worktree. A remote branch proves it
+as well as a PR does; don't wait for git's merge detection to agree either, since
+a squash-merged or rebased PR leaves no ancestry for `--merged` to find, which is
+exactly the case that strands worktrees for months.
+
+Check both refs, because the common end state has only one of them. Merged PR plus
+`delete_branch_on_merge` (the repo convention — see the `github` skill) means
+`origin/<branch>` is gone while the PR still holds the commits; a pushed branch
+with no PR yet is the mirror case.
+
+```bash
+git -C <wt> merge-base --is-ancestor HEAD <pr_head_oid>       # exit 0 = contained
+git -C <wt> merge-base --is-ancestor HEAD origin/<branch>     # either one suffices
+```
+
+Test containment against those rather than `@{upstream}`, which gets two cases
+wrong: the branch was advanced from another worktree (local is *behind* — still
+contained, still safe) and there is no upstream ref at all (it just errors). If
+local is **ahead** of both, it carries commits nothing else has — that is the
+confirm row.
+
+Nothing contained is ever unsafe to remove, stale or not. So in an actual space
+crunch, containment alone licenses removal — a contained worktree costs one
+`git worktree add` to bring back. Staleness is just what makes it uncontroversial.
+
+### Remove
+
+Present the table — path, size, branch, PR or remote ref, last activity — then:
+
+```bash
+git worktree remove <path>            # refuses on dirty or untracked files, or if locked
+git worktree unlock <path>            # only if it is locked and you mean it
+```
+
+Remove contained worktrees without asking; get explicit sign-off for anything in
+the confirm row. `--force` overrides both the dirty-tree refusal and the lock, so it
+throws away exactly the evidence the classification depends on — never reach for it on a
+worktree you have not classified, and never on a dirty one that failed the
+containment check.
+
+Removal leaves the branch alone; step 6 decides that separately. If the worktree
+had a row in `~/.claude/worktrees.md` (see [worktrees](./worktrees.md)), drop it
+in the same pass.
+
+## 6. Prune Stale Branches
 
 ### Fetch and prune deleted remote branches
 
@@ -207,7 +308,7 @@ and proposed action. Present it and **wait for confirmation** before any
 destructive `git branch -D`. Only delete MERGED branches without asking; for
 CLOSED and no-PR branches, get explicit sign-off first.
 
-## 6. Narrow Fetch Refspec
+## 7. Narrow Fetch Refspec
 
 By default git fetches all remote branches. Narrow to only your own branches:
 
@@ -308,10 +409,13 @@ git maintenance stop
   share the object DB, so a race corrupts all of them.
 - Treat agent clones as **cattle, not pets**: re-clone proactively every few weeks rather
   than waiting for corruption to force the issue.
+- Cattle still need culling. Background agents abandon worktrees faster than anyone
+  notices, and each is a full checkout — sweep them with step 5 on a schedule, not
+  once the disk is full.
 
 ## Applying to Other Repos
 
-Run steps 1-5 in each clone under `~/code/`. Step 6 (refspec) is per-repo
+Run steps 1-6 in each clone under `~/code/`. Step 7 (refspec) is per-repo
 and needs to be applied to each clone separately.
 
 ```bash
@@ -320,7 +424,8 @@ git pull --ff-only origin main   # sync main first (step 1)
 git gc --prune=now
 git config maintenance.auto true
 git fetch --prune
-# Branch cleanup: use the PR-aware flow in step 5 — do NOT blanket-delete
+git worktree prune -v            # then classify what is left — step 5
+# Branch cleanup: use the PR-aware flow in step 6 — do NOT blanket-delete
 # ": gone]" branches. Look up each branch's PR and confirm before deleting
 # anything not cleanly merged.
 ```
