@@ -63,6 +63,11 @@ It renders from a small Rust binary — the same `make install` as above — wir
 into `settings.json` as a `statusLine` command. `/statusbar-install` does the
 whole thing: builds it, writes the settings block, and smoke-tests the render.
 
+Once it's running, ask for the bar you want — "add the model", "my paths are
+too long", "stop showing PRs" — and the `statusbar-config` skill knows which
+key that is, where the config file lives, and how to render the result back to
+you without waiting for a refresh.
+
 ### `datasets`
 
 Curated reference data Claude can find: markdown, CSV, TSV, JSON or YAML under
