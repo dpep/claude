@@ -19,7 +19,7 @@ config toggle is on:
 | **worktree** (dim) | `wt:<name>` — only when it differs from the branch | on |
 | **ref** | the git branch, or the **PR number** in its place (see below) | on |
 | **pr** | `#<number>`, colored green/red by review state | on (when PR open) |
-| **session** (dim) | `[<name>]` when the session is named | on |
+| **session** (dim) | `[<name>]` when the session is named, capped at 24 chars | on |
 | **model** (dim) | the model family — `Opus 5 (1M context)` → `Opus` | off |
 | **context** | `ctx:N%` of the context window used; yellow near compaction | on ≥50% |
 | **rate** | `rate:N% (Nm)` of the 5-hour quota + reset countdown; yellow/red | on ≥70% |
@@ -63,10 +63,10 @@ malformed file falls back to defaults (the status line never breaks a session).
 {
   "separator": " · ",
   "cwd": { "strip_prefixes": ["~/workspace/"], "collapse_depth": 3 },
-  "branch": { "enabled": true, "strip_prefixes": ["dp/"], "strip_handle": true, "hide_on": ["main", "master"] },
+  "branch": { "enabled": true, "strip_prefixes": ["dp/"], "strip_handle": true, "hide_on": ["main", "master"], "max_len": 24 },
   "pr": { "enabled": true, "prefer_over_branch": true },
   "worktree": true,
-  "session": true,
+  "session": { "enabled": true, "max_len": 24 },
   "model": { "enabled": true, "abbreviate": true, "hide": ["Opus"] },
   "context_window": { "enabled": true, "show_at": 50, "warn_at": 80 },
   "rate_limit": { "enabled": true, "warn_at": 70, "danger_at": 90 }
@@ -82,6 +82,11 @@ malformed file falls back to defaults (the status line never breaks a session).
   is the `gh` CLI's logged-in user (read from `~/.config/gh/hosts.yml`, no
   network call). So a `<handle>/my-feature` branch shows as `my-feature` with
   no config; set `false` to disable. **`hide_on`** — branches that render nothing.
+- **`branch.max_len` / `session.max_len`** (both 24) — cap these two free-text
+  segments, breaking at a word boundary when one is near and appending `…`. They
+  are written for humans, not for a 60-column bar, and an uncapped one pushes
+  everything right of it off the edge — the model segment goes first. `0` lifts
+  the cap. `"session": true` still works and means `{"enabled": true}`.
 - **`model.abbreviate`** (default on) — show only the family: `Opus 5 (1M
   context)` → `Opus`, `Claude Sonnet 4.5` → `Sonnet`. It takes the first token
   that is neither the `Claude` vendor prefix nor a version number, so a family

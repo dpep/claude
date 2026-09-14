@@ -37,8 +37,13 @@ which segments render. Editing it to change the bar's contents does nothing.
 | stop showing PRs | `pr.enabled: false` |
 | always show context %, not just when high | `context_window.show_at: 0` |
 | context / rate warnings are too noisy | raise `context_window.show_at`, `rate_limit.warn_at` |
+| the session name / branch eats the bar | both cap at 24 by default; tune `session.max_len`, `branch.max_len`, or `0` to uncap |
 | drop the worktree or session tag | `worktree: false` / `session: false` |
 | different separator | `separator` |
+
+The session name is whatever Claude Code derived when the session started, so
+on a long session it goes stale — it describes the first task, not the current
+one. Capping it limits the damage; it does not fix it.
 
 A minimal file that turns on the model and nothing else:
 

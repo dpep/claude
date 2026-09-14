@@ -8,6 +8,11 @@
 
 use serde::Deserialize;
 
+/// Default cap for the free-text segments. Session names and branch names are
+/// written for humans, not for a 60-column bar, and they crowd out everything
+/// to their right.
+const DEFAULT_MAX_LEN: usize = 24;
+
 #[derive(Debug, Deserialize)]
 #[serde(default)]
 pub struct Config {
@@ -19,7 +24,7 @@ pub struct Config {
     /// Show a dim `wt:<name>` when the worktree differs from the branch.
     pub worktree: bool,
     /// Show a dim `[name]` when the session is named.
-    pub session: bool,
+    pub session: SessionConfig,
     pub rate_limit: RateConfig,
     pub context_window: ContextConfig,
     /// Show the model's display name, abbreviated (opt-in).
@@ -34,7 +39,7 @@ impl Default for Config {
             branch: BranchConfig::default(),
             pr: PrConfig::default(),
             worktree: true,
-            session: true,
+            session: SessionConfig::default(),
             rate_limit: RateConfig::default(),
             context_window: ContextConfig::default(),
             model: ModelConfig::default(),
@@ -76,6 +81,8 @@ pub struct BranchConfig {
     pub strip_handle: bool,
     /// Branches that render nothing (the "you're on trunk" case).
     pub hide_on: Vec<String>,
+    /// Cap the rendered branch at this many characters; 0 means no cap.
+    pub max_len: usize,
 }
 
 impl Default for BranchConfig {
@@ -85,6 +92,7 @@ impl Default for BranchConfig {
             strip_prefixes: Vec::new(),
             strip_handle: true,
             hide_on: vec!["main".to_string(), "master".to_string()],
+            max_len: DEFAULT_MAX_LEN,
         }
     }
 }
@@ -178,6 +186,65 @@ impl Default for ModelConfig {
     }
 }
 
+/// `"session": true` was the original spelling and still works; a table adds
+/// `max_len`. Accepting both matters more than usual here — a type mismatch
+/// discards the entire config file, so silently dropping the bool form would
+/// wipe every other setting a user has.
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum SessionRepr {
+    Flag(bool),
+    Table(SessionTable),
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(default)]
+struct SessionTable {
+    enabled: bool,
+    max_len: usize,
+}
+
+impl Default for SessionTable {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            max_len: DEFAULT_MAX_LEN,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(from = "SessionRepr")]
+pub struct SessionConfig {
+    pub enabled: bool,
+    /// Cap the rendered session name at this many characters; 0 means no cap.
+    pub max_len: usize,
+}
+
+impl Default for SessionConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            max_len: DEFAULT_MAX_LEN,
+        }
+    }
+}
+
+impl From<SessionRepr> for SessionConfig {
+    fn from(r: SessionRepr) -> Self {
+        match r {
+            SessionRepr::Flag(enabled) => Self {
+                enabled,
+                ..Self::default()
+            },
+            SessionRepr::Table(t) => Self {
+                enabled: t.enabled,
+                max_len: t.max_len,
+            },
+        }
+    }
+}
+
 impl Config {
     /// Parse a config document, falling back to defaults on any error so
     /// a malformed file never breaks the bar.
@@ -194,7 +261,8 @@ mod tests {
     fn defaults_are_sane() {
         let c = Config::default();
         assert_eq!(c.separator, " · ");
-        assert!(c.worktree && c.session && c.rate_limit.enabled);
+        assert!(c.worktree && c.session.enabled && c.rate_limit.enabled);
+        assert_eq!(c.session.max_len, DEFAULT_MAX_LEN);
         assert!(c.context_window.enabled);
         assert!(c.pr.enabled && c.pr.prefer_over_branch);
         assert!(!c.model.enabled);

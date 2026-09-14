@@ -7,6 +7,8 @@
 //! is set and a PR is present. Each segment is independently gated by
 //! config and by whether its data exists; absent segments don't join in.
 
+use std::borrow::Cow;
+
 use crate::config::{BranchConfig, Config, CwdConfig};
 use crate::input::{Pr, Session};
 
@@ -62,7 +64,8 @@ pub fn render(s: &Session, env: &Env, cfg: &Config) -> String {
     if !pr_in_ref && cfg.branch.enabled {
         if let Some(b) = env.branch {
             if !b.is_empty() && !cfg.branch.hide_on.iter().any(|h| h == b) {
-                parts.push(branch_display(b, &cfg.branch, env.github_handle).to_string());
+                let shown = branch_display(b, &cfg.branch, env.github_handle);
+                parts.push(truncate(shown, cfg.branch.max_len).into_owned());
             }
         }
     }
@@ -71,9 +74,10 @@ pub fn render(s: &Session, env: &Env, cfg: &Config) -> String {
     }
 
     // Session name (dim).
-    if cfg.session {
+    if cfg.session.enabled {
         if let Some(name) = s.session_name.as_deref() {
             if !name.is_empty() {
+                let name = truncate(name, cfg.session.max_len);
                 parts.push(format!("{DIM}[{name}]{RESET}"));
             }
         }
@@ -211,6 +215,22 @@ fn branch_display<'a>(branch: &'a str, cfg: &BranchConfig, handle: Option<&str>)
     branch
 }
 
+/// Cap a free-text segment's width. Breaks at a word boundary when one sits in
+/// the last third, so the ellipsis lands between words instead of mid-word;
+/// otherwise cuts hard. `max == 0` means no cap. Char-based, so a multi-byte
+/// name is never sliced through the middle of a character.
+fn truncate(s: &str, max: usize) -> Cow<'_, str> {
+    if max == 0 || s.chars().count() <= max {
+        return Cow::Borrowed(s);
+    }
+    let head: Vec<char> = s.chars().take(max - 1).collect();
+    let keep = match head.iter().rposition(|c| c.is_whitespace()) {
+        Some(i) if i * 3 >= (max - 1) * 2 => i,
+        _ => head.len(),
+    };
+    let body: String = head[..keep].iter().collect();
+    Cow::Owned(format!("{}…", body.trim_end()))
+}
 /// Strip ANSI SGR escape sequences — used for `--json` output and tests.
 /// Char-based so multi-byte separators (`·`) survive intact.
 pub fn strip_ansi(s: &str) -> String {
@@ -453,6 +473,53 @@ mod tests {
         let s =
             Session::parse(r#"{"workspace": {"current_dir": "/tmp/x"}, "pr": {"number": 474}}"#);
         assert_eq!(plain(&s, &env(Some("feat")), &cfg), "/tmp/x · feat · #474");
+    }
+
+    #[test]
+    fn long_session_name_is_capped_at_a_word_boundary() {
+        let s = Session::parse(
+            r#"{"workspace": {"current_dir": "/tmp/x"}, "session_name": "PR code-ref linking in /code:git skill"}"#,
+        );
+        assert_eq!(
+            plain(&s, &env(Some("main")), &Config::default()),
+            "/tmp/x · [PR code-ref linking in…]"
+        );
+    }
+
+    #[test]
+    fn session_max_len_zero_means_no_cap() {
+        let cfg = Config::parse(r#"{"session": {"enabled": true, "max_len": 0}}"#);
+        let s = Session::parse(
+            r#"{"workspace": {"current_dir": "/tmp/x"}, "session_name": "PR code-ref linking in /code:git skill"}"#,
+        );
+        assert_eq!(
+            plain(&s, &env(Some("main")), &cfg),
+            "/tmp/x · [PR code-ref linking in /code:git skill]"
+        );
+    }
+
+    #[test]
+    fn session_still_accepts_the_bare_bool() {
+        let s = Session::parse(
+            r#"{"workspace": {"current_dir": "/tmp/x"}, "session_name": "short"}"#,
+        );
+        let on = Config::parse(r#"{"session": true}"#);
+        assert_eq!(plain(&s, &env(Some("main")), &on), "/tmp/x · [short]");
+        let off = Config::parse(r#"{"session": false}"#);
+        assert_eq!(plain(&s, &env(Some("main")), &off), "/tmp/x");
+        // and the bool form must not disturb its neighbours in the same file
+        let with_sibling = Config::parse(r#"{"session": false, "separator": " | "}"#);
+        assert_eq!(with_sibling.separator, " | ");
+    }
+
+    #[test]
+    fn long_branch_is_capped() {
+        let cfg = Config::parse(r#"{"branch": {"strip_handle": false}}"#);
+        let s = Session::parse(r#"{"workspace": {"current_dir": "/tmp/x"}}"#);
+        assert_eq!(
+            plain(&s, &env(Some("dpep/statusbar-truncate-long-segments")), &cfg),
+            "/tmp/x · dpep/statusbar-truncate…"
+        );
     }
 
     #[test]

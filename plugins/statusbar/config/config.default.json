@@ -8,14 +8,18 @@
     "enabled": true,
     "strip_prefixes": [],
     "strip_handle": true,
-    "hide_on": ["main", "master"]
+    "hide_on": ["main", "master"],
+    "max_len": 24
   },
   "pr": {
     "enabled": true,
     "prefer_over_branch": true
   },
   "worktree": true,
-  "session": true,
+  "session": {
+    "enabled": true,
+    "max_len": 24
+  },
   "model": {
     "enabled": false,
     "abbreviate": true,
