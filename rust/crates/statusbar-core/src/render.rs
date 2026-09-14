@@ -82,9 +82,15 @@ pub fn render(s: &Session, env: &Env, cfg: &Config) -> String {
     // Model display name (dim, opt-in), hidden when it's an everyday default.
     if cfg.model.enabled {
         if let Some(name) = s.model.as_ref().and_then(|m| m.display_name.as_deref()) {
-            let hidden = cfg.model.hide.iter().any(|h| h.eq_ignore_ascii_case(name));
+            let family = model_family(name);
+            let hidden = cfg
+                .model
+                .hide
+                .iter()
+                .any(|h| h.eq_ignore_ascii_case(name) || h.eq_ignore_ascii_case(family));
             if !name.is_empty() && !hidden {
-                parts.push(format!("{DIM}{name}{RESET}"));
+                let shown = if cfg.model.abbreviate { family } else { name };
+                parts.push(format!("{DIM}{shown}{RESET}"));
             }
         }
     }
@@ -223,6 +229,19 @@ pub fn strip_ansi(s: &str) -> String {
         }
     }
     out
+}
+
+/// The model's family — `Opus 5 (1M context)` → `Opus`, `Claude Sonnet 4.5` →
+/// `Sonnet`. Deliberately not a list of known families: the first token that
+/// is neither the `Claude` vendor prefix nor a version number is the family,
+/// so a model line we have never heard of still abbreviates. Falls back to the
+/// whole name when nothing qualifies.
+fn model_family(name: &str) -> &str {
+    name.split(|c: char| c.is_whitespace() || c == '-')
+        .find(|tok| {
+            !tok.eq_ignore_ascii_case("claude") && tok.starts_with(|c: char| c.is_alphabetic())
+        })
+        .unwrap_or(name)
 }
 
 #[cfg(test)]
@@ -434,6 +453,47 @@ mod tests {
         let s =
             Session::parse(r#"{"workspace": {"current_dir": "/tmp/x"}, "pr": {"number": 474}}"#);
         assert_eq!(plain(&s, &env(Some("feat")), &cfg), "/tmp/x · feat · #474");
+    }
+
+    #[test]
+    fn model_abbreviates_to_its_family_by_default() {
+        let cfg = Config::parse(r#"{"model": {"enabled": true}}"#);
+        for (display, want) in [
+            ("Opus 5 (1M context)", "Opus"),
+            ("Claude Sonnet 4.5", "Sonnet"),
+            ("claude-haiku-4-5", "haiku"),
+            ("Fable 5.1", "Fable"),
+        ] {
+            let s = Session::parse(&format!(
+                r#"{{"workspace": {{"current_dir": "/tmp/x"}}, "model": {{"display_name": "{display}"}}}}"#
+            ));
+            assert_eq!(
+                plain(&s, &env(Some("main")), &cfg),
+                format!("/tmp/x · {want}"),
+                "abbreviating {display}"
+            );
+        }
+    }
+
+    #[test]
+    fn model_keeps_full_name_when_abbreviate_is_off() {
+        let cfg = Config::parse(r#"{"model": {"enabled": true, "abbreviate": false}}"#);
+        let s = Session::parse(
+            r#"{"workspace": {"current_dir": "/tmp/x"}, "model": {"display_name": "Opus 5 (1M context)"}}"#,
+        );
+        assert_eq!(
+            plain(&s, &env(Some("main")), &cfg),
+            "/tmp/x · Opus 5 (1M context)"
+        );
+    }
+
+    #[test]
+    fn model_hide_matches_the_family_not_just_the_full_name() {
+        let cfg = Config::parse(r#"{"model": {"enabled": true, "hide": ["opus"]}}"#);
+        let s = Session::parse(
+            r#"{"workspace": {"current_dir": "/tmp/x"}, "model": {"display_name": "Opus 5 (1M context)"}}"#,
+        );
+        assert_eq!(plain(&s, &env(Some("main")), &cfg), "/tmp/x");
     }
 
     #[test]

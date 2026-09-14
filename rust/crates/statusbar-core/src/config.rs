@@ -155,13 +155,27 @@ impl Default for ContextConfig {
     }
 }
 
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, Deserialize)]
 #[serde(default)]
 pub struct ModelConfig {
     pub enabled: bool,
     /// Hide the segment when the model name is in this list — e.g. your
-    /// everyday default, which isn't worth the pixels. Case-insensitive.
+    /// everyday default, which isn't worth the pixels. Case-insensitive,
+    /// and matched against the family as well as the full name, so
+    /// `["Opus"]` works whether or not `abbreviate` is on.
     pub hide: Vec<String>,
+    /// Show only the model family: `Opus 5 (1M context)` → `Opus`.
+    pub abbreviate: bool,
+}
+
+impl Default for ModelConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            hide: Vec::new(),
+            abbreviate: true,
+        }
+    }
 }
 
 impl Config {

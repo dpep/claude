@@ -18,6 +18,7 @@
   "session": true,
   "model": {
     "enabled": false,
+    "abbreviate": true,
     "hide": []
   },
   "context_window": {

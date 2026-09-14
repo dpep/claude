@@ -20,7 +20,7 @@ config toggle is on:
 | **ref** | the git branch, or the **PR number** in its place (see below) | on |
 | **pr** | `#<number>`, colored green/red by review state | on (when PR open) |
 | **session** (dim) | `[<name>]` when the session is named | on |
-| **model** (dim) | the model's display name, abbreviated | off |
+| **model** (dim) | the model family — `Opus 5 (1M context)` → `Opus` | off |
 | **context** | `ctx:N%` of the context window used; yellow near compaction | on ≥50% |
 | **rate** | `rate:N% (Nm)` of the 5-hour quota + reset countdown; yellow/red | on ≥70% |
 
@@ -67,7 +67,7 @@ malformed file falls back to defaults (the status line never breaks a session).
   "pr": { "enabled": true, "prefer_over_branch": true },
   "worktree": true,
   "session": true,
-  "model": { "enabled": true, "hide": ["Opus"] },
+  "model": { "enabled": true, "abbreviate": true, "hide": ["Opus"] },
   "context_window": { "enabled": true, "show_at": 50, "warn_at": 80 },
   "rate_limit": { "enabled": true, "warn_at": 70, "danger_at": 90 }
 }
@@ -82,8 +82,14 @@ malformed file falls back to defaults (the status line never breaks a session).
   is the `gh` CLI's logged-in user (read from `~/.config/gh/hosts.yml`, no
   network call). So a `<handle>/my-feature` branch shows as `my-feature` with
   no config; set `false` to disable. **`hide_on`** — branches that render nothing.
+- **`model.abbreviate`** (default on) — show only the family: `Opus 5 (1M
+  context)` → `Opus`, `Claude Sonnet 4.5` → `Sonnet`. It takes the first token
+  that is neither the `Claude` vendor prefix nor a version number, so a family
+  it has never seen still abbreviates. Set `false` for the full display name.
 - **`model.hide`** — model names to omit (case-insensitive) — e.g. hide your
   everyday default so the segment only appears when you're on something else.
+  Matched against the family as well as the full name, so `["Opus"]` works
+  either way.
 - **`context_window.show_at` / `warn_at`** — the `ctx:` floor and the
   turns-yellow threshold. **`rate_limit.warn_at` / `danger_at`** — yellow and
   red thresholds; below `warn_at` the segment is hidden.
