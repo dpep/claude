@@ -41,22 +41,26 @@ pub struct Env<'a> {
 pub fn render(s: &Session, env: &Env, cfg: &Config) -> String {
     let mut parts: Vec<String> = Vec::new();
 
-    // Working directory (cyan).
+    // Working directory (cyan), flagged when the checkout is a worktree.
+    //
+    // The worktree's *name* earns nothing: it is the branch name or the
+    // directory name, both already on the bar, so `wt:<name>` rendered the same
+    // word twice. Only the fact is worth space, and it hangs off the path
+    // rather than standing alone, because the path is what is a worktree.
+    let in_worktree = cfg.worktree
+        && s.workspace
+            .git_worktree
+            .as_deref()
+            .is_some_and(|wt| !wt.is_empty());
     if let Some(dir) = s.workspace.current_dir.as_deref() {
         if !dir.is_empty() {
-            parts.push(format!(
-                "{CYAN}{}{RESET}",
-                cwd_display(dir, env.home, &cfg.cwd)
-            ));
-        }
-    }
-
-    // Worktree (dim) — only when it differs from the branch.
-    if cfg.worktree {
-        if let Some(wt) = s.workspace.git_worktree.as_deref() {
-            if !wt.is_empty() && Some(wt) != env.branch {
-                parts.push(format!("{DIM}wt:{wt}{RESET}"));
-            }
+            let shown = cwd_display(dir, env.home, &cfg.cwd);
+            let mark = if in_worktree {
+                format!("{DIM} (wt){RESET}")
+            } else {
+                String::new()
+            };
+            parts.push(format!("{CYAN}{shown}{RESET}{mark}"));
         }
     }
 
@@ -381,18 +385,23 @@ mod tests {
     }
 
     #[test]
-    fn worktree_shown_only_when_differs_from_branch() {
-        let s = Session::parse(
+    fn worktree_marks_the_path_without_naming_itself() {
+        let wt = Session::parse(
             r#"{"workspace": {"current_dir": "/tmp/x", "git_worktree": "feature"}}"#,
         );
+        // The name is the branch or the directory — both already on the bar.
         assert_eq!(
-            plain(&s, &env(Some("main")), &Config::default()),
-            "/tmp/x · wt:feature"
+            plain(&wt, &env(Some("feature")), &Config::default()),
+            "/tmp/x (wt) · feature"
         );
+        let plain_checkout =
+            Session::parse(r#"{"workspace": {"current_dir": "/tmp/x"}}"#);
         assert_eq!(
-            plain(&s, &env(Some("feature")), &Config::default()),
+            plain(&plain_checkout, &env(Some("feature")), &Config::default()),
             "/tmp/x · feature"
         );
+        let off = Config::parse(r#"{"worktree": false}"#);
+        assert_eq!(plain(&wt, &env(Some("feature")), &off), "/tmp/x · feature");
     }
 
     #[test]
@@ -621,7 +630,7 @@ mod tests {
         );
         assert_eq!(
             plain(&s, &env(Some("feat")), &cfg),
-            "~/projects · wt:wt-a · feat · #474 · [rv] · Opus · ctx:85% · rate:92% (20m)"
+            "~/projects (wt) · feat · #474 · [rv] · Opus · ctx:85% · rate:92% (20m)"
         );
     }
 

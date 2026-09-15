@@ -5,7 +5,7 @@ state as JSON to a status-line command every ~10s; statusbar renders it into a
 tidy bar of `·`-joined segments with ANSI color.
 
 ```
-~/code/lib/claude · example-api · [review] · ctx:72% · rate:88% (14m)
+~/code/lib/claude (wt) · example-api · [review] · ctx:72% · rate:88% (14m)
 ```
 
 ## What it renders
@@ -16,7 +16,7 @@ config toggle is on:
 | Segment | Shows | Default |
 |---|---|---|
 | **cwd** (cyan) | working dir; `$HOME`→`~`, deep paths collapse to `…/parent/current` | on |
-| **worktree** (dim) | `wt:<name>` — only when it differs from the branch | on |
+| **worktree** (dim) | `(wt)` on the path when the checkout is a worktree — the fact, not the name | on |
 | **ref** | the git branch, or the **PR number** in its place (see below) | on |
 | **pr** | `#<number>`, colored green/red by review state | on (when PR open) |
 | **session** (dim) | `[<name>]` — your name, else the auto label, else Claude Code's; capped at 24 | on |
