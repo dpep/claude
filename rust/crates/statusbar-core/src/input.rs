@@ -12,6 +12,7 @@ use serde::Deserialize;
 pub struct Session {
     pub workspace: Workspace,
     pub session_name: Option<String>,
+    pub session_id: Option<String>,
     pub rate_limits: Option<RateLimits>,
     pub context_window: Option<ContextWindow>,
     pub pr: Option<Pr>,

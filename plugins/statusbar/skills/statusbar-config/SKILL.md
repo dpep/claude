@@ -41,9 +41,16 @@ which segments render. Editing it to change the bar's contents does nothing.
 | drop the worktree or session tag | `worktree: false` / `session: false` |
 | different separator | `separator` |
 
-The session name is whatever Claude Code derived when the session started, so
-on a long session it goes stale — it describes the first task, not the current
-one. Capping it limits the damage; it does not fix it.
+**When the session name is stale** — it describes the first task, because
+that's when Claude Code derived it — set `session.auto_label: true`. A `Stop`
+hook then re-derives a short label from recent work every
+`session.label_ttl_minutes` (30) and caches it per session under
+`~/.cache/claude/statusbar/labels/`.
+
+A name the user set by hand always wins over that, and needs no config: the
+label file records the generated title it was written against, so when the live
+name moves off it the hand-set one takes the slot. To go back to Claude Code's
+own name, delete the label file or set `auto_label: false`.
 
 A minimal file that turns on the model and nothing else:
 

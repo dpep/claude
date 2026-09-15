@@ -18,7 +18,9 @@
   "worktree": true,
   "session": {
     "enabled": true,
-    "max_len": 24
+    "max_len": 24,
+    "auto_label": false,
+    "label_ttl_minutes": 30
   },
   "model": {
     "enabled": false,

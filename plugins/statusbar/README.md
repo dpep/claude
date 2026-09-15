@@ -19,7 +19,7 @@ config toggle is on:
 | **worktree** (dim) | `wt:<name>` — only when it differs from the branch | on |
 | **ref** | the git branch, or the **PR number** in its place (see below) | on |
 | **pr** | `#<number>`, colored green/red by review state | on (when PR open) |
-| **session** (dim) | `[<name>]` when the session is named, capped at 24 chars | on |
+| **session** (dim) | `[<name>]` — your name, else the auto label, else Claude Code's; capped at 24 | on |
 | **model** (dim) | the model family — `Opus 5 (1M context)` → `Opus` | off |
 | **context** | `ctx:N%` of the context window used; yellow near compaction | on ≥50% |
 | **rate** | `rate:N% (Nm)` of the 5-hour quota + reset countdown; yellow/red | on ≥70% |
@@ -66,7 +66,7 @@ malformed file falls back to defaults (the status line never breaks a session).
   "branch": { "enabled": true, "strip_prefixes": ["dp/"], "strip_handle": true, "hide_on": ["main", "master"], "max_len": 24 },
   "pr": { "enabled": true, "prefer_over_branch": true },
   "worktree": true,
-  "session": { "enabled": true, "max_len": 24 },
+  "session": { "enabled": true, "max_len": 24, "auto_label": false, "label_ttl_minutes": 30 },
   "model": { "enabled": true, "abbreviate": true, "hide": ["Opus"] },
   "context_window": { "enabled": true, "show_at": 50, "warn_at": 80 },
   "rate_limit": { "enabled": true, "warn_at": 70, "danger_at": 90 }
@@ -82,6 +82,18 @@ malformed file falls back to defaults (the status line never breaks a session).
   is the `gh` CLI's logged-in user (read from `~/.config/gh/hosts.yml`, no
   network call). So a `<handle>/my-feature` branch shows as `my-feature` with
   no config; set `false` to disable. **`hide_on`** — branches that render nothing.
+- **`session.auto_label`** (default off) — re-derive the session label from
+  recent work instead of living with the name Claude Code generated at session
+  start, which describes the first task forever. A `Stop` hook writes a short
+  label to `~/.cache/claude/statusbar/labels/<session_id>` and the bar prefers
+  it. Off by default because it spends a (small, Haiku) model call.
+  **`label_ttl_minutes`** (30) — how stale a label may get before the next
+  `Stop` re-derives one; a new session always labels on its first stop.
+
+  Precedence in that one slot, highest first: **a name you set by hand** (the
+  label file records the generated title it was written against, so the moment
+  the live name moves off it, yours wins), then **the auto label**, then
+  **Claude Code's generated name**. Never two of them — there isn't room.
 - **`branch.max_len` / `session.max_len`** (both 24) — cap these two free-text
   segments, breaking at a word boundary when one is near and appending `…`. They
   are written for humans, not for a 60-column bar, and an uncapped one pushes

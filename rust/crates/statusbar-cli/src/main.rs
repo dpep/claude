@@ -18,7 +18,7 @@ use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use clap::Parser;
-use claude_paths::config_dir;
+use claude_paths::{cache_dir, config_dir};
 use output::Mode;
 use serde::Serialize;
 use statusbar_core::{handle_from_hosts_yml, render, strip_ansi, Config, Env, Session};
@@ -71,11 +71,16 @@ fn main() {
         .map(|d| d.as_secs() as i64)
         .unwrap_or(0);
 
+    let label = load_label(
+        session.session_id.as_deref(),
+        session.session_name.as_deref(),
+    );
     let env = Env {
         branch: branch.as_deref(),
         github_handle: handle.as_deref(),
         home: &home,
         now_unix,
+        label: label.as_deref(),
     };
     let rendered = render(&session, &env, &cfg);
 
@@ -91,6 +96,32 @@ fn main() {
         // No trailing newline — Claude Code renders the line as-is.
         print!("{rendered}");
     }
+}
+
+/// A short, current label for this session, written by the `label-session`
+/// Stop hook. Per-session because one machine runs many at once, and under
+/// the cache dir because it is regenerable — losing it costs one refresh.
+fn load_label(session_id: Option<&str>, session_name: Option<&str>) -> Option<String> {
+    let id = session_id.filter(|id| {
+        // It lands in a path, so refuse anything that isn't a plain id.
+        !id.is_empty() && id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+    })?;
+    let path = cache_dir("statusbar").join("labels").join(id);
+    let text = std::fs::read_to_string(path).ok()?;
+    let mut lines = text.lines();
+    let label = lines.next()?.trim();
+    if label.is_empty() {
+        return None;
+    }
+    // Line two records the generated title this label was written against. If
+    // the live name has moved off it, a human renamed the session since — a
+    // deliberate act, and it outranks anything we derived.
+    if let (Some(recorded), Some(current)) = (lines.next().map(str::trim), session_name) {
+        if !recorded.is_empty() && recorded != current {
+            return None;
+        }
+    }
+    Some(label.to_string())
 }
 
 /// Load `~/.config/claude/statusbar/config.json`, defaulting on any miss.

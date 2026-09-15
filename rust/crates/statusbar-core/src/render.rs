@@ -30,6 +30,10 @@ pub struct Env<'a> {
     pub github_handle: Option<&'a str>,
     pub home: &'a str,
     pub now_unix: i64,
+    /// A caller-supplied label for the session, preferred over the name
+    /// Claude Code derived at session start — that one describes the first
+    /// task forever, and there is only room for one of them.
+    pub label: Option<&'a str>,
 }
 
 /// Render the full status line. Never panics; missing data yields fewer
@@ -75,7 +79,7 @@ pub fn render(s: &Session, env: &Env, cfg: &Config) -> String {
 
     // Session name (dim).
     if cfg.session.enabled {
-        if let Some(name) = s.session_name.as_deref() {
+        if let Some(name) = env.label.or(s.session_name.as_deref()) {
             if !name.is_empty() {
                 let name = truncate(name, cfg.session.max_len);
                 parts.push(format!("{DIM}[{name}]{RESET}"));
@@ -274,6 +278,7 @@ mod tests {
             github_handle: None,
             home: "/home/x",
             now_unix: 1_000,
+            label: None,
         }
     }
 
@@ -473,6 +478,29 @@ mod tests {
         let s =
             Session::parse(r#"{"workspace": {"current_dir": "/tmp/x"}, "pr": {"number": 474}}"#);
         assert_eq!(plain(&s, &env(Some("feat")), &cfg), "/tmp/x · feat · #474");
+    }
+
+    #[test]
+    fn label_replaces_the_session_name_and_is_capped_too() {
+        let s = Session::parse(
+            r#"{"workspace": {"current_dir": "/tmp/x"}, "session_name": "PR code-ref linking in /code:git skill"}"#,
+        );
+        let mut e = env(Some("main"));
+        e.label = Some("statusbar session labels");
+        assert_eq!(plain(&s, &e, &Config::default()), "/tmp/x · [statusbar session labels]");
+        e.label = Some("a label long enough to need capping");
+        assert_eq!(plain(&s, &e, &Config::default()), "/tmp/x · [a label long enough to…]");
+    }
+
+    #[test]
+    fn session_name_is_used_when_there_is_no_label() {
+        let s = Session::parse(
+            r#"{"workspace": {"current_dir": "/tmp/x"}, "session_name": "review"}"#,
+        );
+        assert_eq!(
+            plain(&s, &env(Some("main")), &Config::default()),
+            "/tmp/x · [review]"
+        );
     }
 
     #[test]
