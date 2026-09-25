@@ -1,7 +1,7 @@
 {
   "name": "code",
-  "version": "0.22.0",
-  "description": "Programming workflow & code-navigation skills: git (branches, commits, worktrees), rq (find a definition by name), gqls (search a GraphQL schema by name, or jump to a resolver), find-gem (locate + search installed Ruby gem source). cli-development (house conventions for getting a CLI production-ready \u2014 flags, output formats, exit codes, streaming, observability). Will grow to review, testing, and language patterns.",
+  "version": "0.23.0",
+  "description": "Programming workflow & code-navigation skills: git (branches, commits, worktrees), rq (find a definition by name), gqls (search a GraphQL schema by name, or jump to a resolver), find-gem (locate + search installed Ruby gem source), gc (reclaim disk from build output, stale deps, finished worktrees and caches). cli-development (house conventions for getting a CLI production-ready \u2014 flags, output formats, exit codes, streaming, observability). Will grow to review, testing, and language patterns.",
   "author": {
     "name": "Daniel Pepper",
     "url": "https://github.com/dpep"

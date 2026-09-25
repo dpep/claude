@@ -14,6 +14,7 @@ build:
 test:
 	cd rust && cargo test --workspace
 	bash script/find-gem-test.sh
+	bash script/code-gc-test.sh
 
 fmt:
 	cd rust && cargo fmt --all
@@ -35,6 +36,8 @@ install: build
 	@echo "linked $(CLAUDE_BIN_DIR)/statusbar  -> rust/target/release/statusbar"
 	@ln -sf "$(CURDIR)/plugins/code/bin/find-gem"      $(CLAUDE_BIN_DIR)/find-gem
 	@echo "linked $(CLAUDE_BIN_DIR)/find-gem   -> plugins/code/bin/find-gem"
+	@ln -sf "$(CURDIR)/plugins/code/bin/code-gc"       $(CLAUDE_BIN_DIR)/code-gc
+	@echo "linked $(CLAUDE_BIN_DIR)/code-gc    -> plugins/code/bin/code-gc"
 	@command -v find-skill >/dev/null 2>&1 || { \
 	    echo ""; \
 	    echo "  ⚠️  $(CLAUDE_BIN_DIR) is not on PATH — add to your shell rc:"; \
@@ -42,8 +45,8 @@ install: build
 	}
 
 uninstall:
-	@rm -f $(CLAUDE_BIN_DIR)/find-skill $(CLAUDE_BIN_DIR)/find-gem $(CLAUDE_BIN_DIR)/statusbar
-	@echo "unlinked find-skill / find-gem / statusbar"
+	@rm -f $(CLAUDE_BIN_DIR)/find-skill $(CLAUDE_BIN_DIR)/find-gem $(CLAUDE_BIN_DIR)/code-gc $(CLAUDE_BIN_DIR)/statusbar
+	@echo "unlinked find-skill / find-gem / code-gc / statusbar"
 
 clean: uninstall
 	cd rust && cargo clean

@@ -1,0 +1,182 @@
+#!/usr/bin/env bash
+# code-gc — find regenerable bloat under one or more code roots.
+# Read-only unless --apply is given. See skills/gc/SKILL.md.
+set -uo pipefail
+
+usage() {
+  cat <<'EOF'
+usage: code-gc <command> [options] [ROOT...]     (ROOT defaults to .)
+
+  survey                     sizes of everything below, one line per category
+  targets   [--apply]        Rust target/ dirs (a Cargo.toml beside them), plus any
+                             installed binary symlinked into one ("relink" lines)
+  deps      [--days N] [--apply]
+                             node_modules / venv / .venv in projects with no
+                             source edit in N days (default 30)
+  worktrees                  linked worktrees: size, branch, unmerged patches, dirty files
+  branches  [--apply]        local branches whose tip is an ancestor of main/master;
+                             --apply uses `git branch -d`, which refuses anything else
+
+Without --apply nothing is deleted. CODE_GC_BIN_DIRS (space-separated) overrides
+where `targets` looks for symlinked binaries.
+EOF
+}
+
+apply=0
+days=30
+roots=()
+
+# Deleting only happens on an explicit --apply; everything else just reports.
+parse() {
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --apply) apply=1 ;;
+      --days) days=${2:?--days needs a number}; shift ;;
+      -h|--help) usage; exit 0 ;;
+      -*) echo "code-gc: unknown option $1" >&2; exit 2 ;;
+      *) roots+=("$1") ;;
+    esac
+    shift
+  done
+  [ ${#roots[@]} -eq 0 ] && roots=(.)
+  # Absolute, so they compare against symlink destinations.
+  local i
+  for i in "${!roots[@]}"; do roots[$i]=$(CDPATH= cd "${roots[$i]}" && pwd) || exit 2; done
+  return 0
+}
+
+human() {
+  awk -v k="$1" 'BEGIN { split("K M G T", u); i = 1; while (k >= 1024 && i < 4) { k /= 1024; i++ }
+    printf (k < 10 && i > 1 ? "%.1f%s" : "%d%s"), k, u[i] }'
+}
+
+# Prints "KB<TAB>path" for each path on stdin, then a total line on stderr-free stdout.
+sized() {
+  local total=0 path kb
+  while IFS= read -r path; do
+    kb=$(du -sk "$path" 2>/dev/null | cut -f1)
+    kb=${kb:-0}
+    total=$((total + kb))
+    printf '%s\t%s\n' "$(human "$kb")" "$path"
+  done
+  printf '%s\ttotal\n' "$(human "$total")"
+}
+
+remove() {
+  local path
+  while IFS= read -r path; do rm -rf "$path"; done
+}
+
+list_targets() {
+  find "${roots[@]}" \( -name node_modules -o -name .git \) -prune -o \
+    -type d -name target -prune -print 2>/dev/null |
+    while IFS= read -r t; do [ -f "$(dirname "$t")/Cargo.toml" ] && echo "$t"; done
+}
+
+bin_dirs=${CODE_GC_BIN_DIRS:-"$HOME/.claude/bin $HOME/.local/bin $HOME/bin $HOME/.cargo/bin /usr/local/bin /opt/homebrew/bin"}
+
+# Installed binaries that point into one of the target dirs on stdin — deleting it breaks them.
+linked_into() {
+  local targets link dest t
+  targets=$(cat)
+  for d in $bin_dirs; do
+    [ -d "$d" ] && find "$d" -maxdepth 1 -type l 2>/dev/null
+  done | while IFS= read -r link; do
+    dest=$(readlink "$link")
+    while IFS= read -r t; do
+      case "$dest" in "$t"/*) printf 'relink\t%s -> %s\n' "$link" "$dest" ;; esac
+    done <<<"$targets"
+  done
+}
+
+# A project is stale when nothing outside its dependency/build/git dirs changed recently.
+list_deps() {
+  find "${roots[@]}" -type d \( -name node_modules -o -name venv -o -name .venv \) -prune -print 2>/dev/null |
+    while IFS= read -r d; do
+      recent=$(find "$(dirname "$d")" \( -name node_modules -o -name venv -o -name .venv \
+        -o -name .git -o -name target \) -prune -o -type f -mtime "-$days" -print 2>/dev/null | head -1)
+      [ -z "$recent" ] && echo "$d"
+    done
+}
+
+list_repos() {
+  find "${roots[@]}" \( -name node_modules -o -name target \) -prune -o \
+    -name .git -type d -prune -print 2>/dev/null | sed 's#/\.git$##'
+}
+
+main_branch() {
+  local b
+  b=$(git -C "$1" symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##')
+  if [ -n "$b" ] && git -C "$1" show-ref -q --verify "refs/heads/$b"; then echo "$b"; return; fi
+  for b in main master; do
+    git -C "$1" show-ref -q --verify "refs/heads/$b" && { echo "$b"; return; }
+  done
+}
+
+cmd_targets() {
+  local targets
+  targets=$(list_targets)
+  [ -n "$targets" ] && echo "$targets" | linked_into
+  if [ $apply -eq 1 ]; then echo "$targets" | remove; echo "removed"; else echo "$targets" | sized; fi
+}
+
+cmd_deps() {
+  if [ $apply -eq 1 ]; then list_deps | remove; echo "removed"; else list_deps | sized; fi
+}
+
+# `git cherry` counts patches missing from main, so squash- or cherry-picked work reads as 0.
+cmd_worktrees() {
+  printf 'size\tunmerged\tdirty\tbranch\tpath\n'
+  list_repos | while IFS= read -r repo; do
+    main=$(main_branch "$repo")
+    git -C "$repo" worktree list --porcelain 2>/dev/null |
+      awk '/^worktree /{w=substr($0,10)} /^branch /{b=substr($0,19)} /^detached/{b=""} /^$/{if(n++) print w "\t" b; w=""; b=""} END{if(n && w!="") print w "\t" b}' |
+      while IFS=$'\t' read -r wt branch; do
+        [ -d "$wt" ] || continue
+        unmerged=?
+        if [ -n "$main" ] && [ -n "$branch" ]; then
+          unmerged=$(git -C "$repo" cherry "$main" "$branch" 2>/dev/null | grep -c '^[+]')
+        fi
+        dirty=$(git -C "$wt" status --porcelain 2>/dev/null | wc -l | tr -d ' ')
+        printf '%s\t%s\t%s\t%s\t%s\n' "$(human "$(du -sk "$wt" | cut -f1)")" "$unmerged" "$dirty" "${branch:-(detached)}" "$wt"
+      done
+  done
+}
+
+cmd_branches() {
+  list_repos | while IFS= read -r repo; do
+    main=$(main_branch "$repo")
+    [ -z "$main" ] && continue
+    current=$(git -C "$repo" branch --show-current)
+    merged=$(git -C "$repo" branch --format='%(refname:short)' --merged "$main" |
+      grep -vxF -e "$main" -e "${current:-$main}" -e main -e master)
+    [ -z "$merged" ] && continue
+    echo "$repo ($main):"
+    echo "$merged" | sed 's/^/  /'
+    # -d, never -D: git re-checks each branch against its upstream too.
+    [ $apply -eq 1 ] && echo "$merged" | xargs git -C "$repo" branch -d -q 2>&1 | grep '^error' | sed 's/^/  /'
+  done
+  return 0
+}
+
+cmd_survey() {
+  printf 'rust targets\t%s\n' "$(list_targets | sized | tail -1 | cut -f1)"
+  printf 'stale deps (%sd)\t%s\n' "$days" "$(list_deps | sized | tail -1 | cut -f1)"
+  printf 'linked worktrees\t%s\n' "$(list_repos | while IFS= read -r r; do
+    git -C "$r" worktree list --porcelain | awk 'NR>1 && /^worktree /{print substr($0,10)}'; done | sized | tail -1 | cut -f1)"
+}
+
+cmd=${1:-}
+[ -z "$cmd" ] && { usage >&2; exit 2; }
+shift
+parse "$@"
+
+case "$cmd" in
+  survey) cmd_survey ;;
+  targets) cmd_targets ;;
+  deps) cmd_deps ;;
+  worktrees) cmd_worktrees ;;
+  branches) cmd_branches ;;
+  -h|--help|help) usage ;;
+  *) echo "code-gc: unknown command $cmd" >&2; usage >&2; exit 2 ;;
+esac

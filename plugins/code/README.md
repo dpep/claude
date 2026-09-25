@@ -20,6 +20,10 @@ Programming workflow & code-navigation skills. No hooks; the `rq` and `gqls` ski
   `-J/--ndjson` like the other CLIs. A bash script shipped in this
   plugin's `bin/` (on PATH inside Claude Code sessions); `make install` at the
   repo root links it into `~/.claude/bin` for regular shells.
+- **gc** — reclaim disk across every checkout under a directory: Rust
+  `target/` dirs, stale `node_modules`/virtualenvs, finished agent worktrees,
+  merged branches, and package/updater caches. Drives `code-gc`, a bash script
+  in `bin/` that only reports unless given `--apply`.
 
 Will grow to cover review, testing, and language-specific patterns.
 
@@ -43,6 +47,7 @@ hook reports which are absent and how to get each:
 | `gqls` | `brew install dpep/tools/gqls` (or `cargo install gqls-cli`) |
 | `find-skill` | `make -C ~/.claude/plugins/marketplaces/dpep install` |
 | `find-gem` | ships in `bin/` here — the same `make install` symlinks it |
+| `code-gc` | ships in `bin/` here — the same `make install` symlinks it |
 
 The hook is quiet when everything resolves, and speaks up out loud only when
 *nothing* does — a fresh install you probably meant to finish. If some tools
