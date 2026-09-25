@@ -8,6 +8,27 @@
 # breaks on the next update. A symlink on PATH survives.
 CLAUDE_BIN_DIR ?= $(HOME)/.claude/bin
 
+# **Symlink from a checkout we own; copy out of one Claude Code owns.**
+# /statusbar-install runs this from the marketplace clone, and
+# `claude plugin marketplace update` REPLACES that clone wholesale — taking
+# rust/target and plugins/code/bin with it and leaving every symlink pointing
+# at nothing, which is how an installed binary silently disappears after an
+# upgrade. A copy survives the wipe; a symlink into a dev checkout keeps the
+# property worth having, which is that `make build` alone puts a new binary
+# live.
+VOLATILE := $(findstring $(HOME)/.claude/plugins/marketplaces/,$(CURDIR))
+
+# $(call install_bin,<path under CURDIR>,<installed name>)
+define install_bin
+@if [ -n "$(VOLATILE)" ]; then \
+    cp -f "$(CURDIR)/$(1)" "$(CLAUDE_BIN_DIR)/$(2)"; \
+    printf 'copied %-11s (from a clone Claude Code replaces)\n' "$(2)"; \
+else \
+    ln -sf "$(CURDIR)/$(1)" "$(CLAUDE_BIN_DIR)/$(2)"; \
+    printf 'linked %-11s -> %s\n' "$(2)" "$(1)"; \
+fi
+endef
+
 build:
 	cd rust && cargo build --release --workspace
 
@@ -30,14 +51,10 @@ check: fmt-check lint test
 
 install: build
 	@mkdir -p $(CLAUDE_BIN_DIR)
-	@ln -sf "$(CURDIR)/rust/target/release/find-skill" $(CLAUDE_BIN_DIR)/find-skill
-	@echo "linked $(CLAUDE_BIN_DIR)/find-skill -> rust/target/release/find-skill"
-	@ln -sf "$(CURDIR)/rust/target/release/statusbar"  $(CLAUDE_BIN_DIR)/statusbar
-	@echo "linked $(CLAUDE_BIN_DIR)/statusbar  -> rust/target/release/statusbar"
-	@ln -sf "$(CURDIR)/plugins/code/bin/find-gem"      $(CLAUDE_BIN_DIR)/find-gem
-	@echo "linked $(CLAUDE_BIN_DIR)/find-gem   -> plugins/code/bin/find-gem"
-	@ln -sf "$(CURDIR)/plugins/code/bin/code-gc"       $(CLAUDE_BIN_DIR)/code-gc
-	@echo "linked $(CLAUDE_BIN_DIR)/code-gc    -> plugins/code/bin/code-gc"
+	$(call install_bin,rust/target/release/find-skill,find-skill)
+	$(call install_bin,rust/target/release/statusbar,statusbar)
+	$(call install_bin,plugins/code/bin/find-gem,find-gem)
+	$(call install_bin,plugins/code/bin/code-gc,code-gc)
 	@command -v find-skill >/dev/null 2>&1 || { \
 	    echo ""; \
 	    echo "  ⚠️  $(CLAUDE_BIN_DIR) is not on PATH — add to your shell rc:"; \
