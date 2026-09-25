@@ -49,7 +49,8 @@ root.
 Agents with a point of view. Each is a self-contained system prompt: summon one
 for a critique, or hand it the work.
 
-**Craft and analysis** — `analyst`, `librarian`, `rubyist`, `rustacean`, `scribe`.
+**Craft and analysis** — `analyst`, `librarian`, `negotiator`, `rubyist`, `rustacean`,
+`scribe`.
 
 **A decision council** — `product-manager`, `hacker`, `staff-engineer`,
 `production-engineer`, `platform-expert`, `skeptic`, chaired by a `moderator`.
