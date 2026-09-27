@@ -275,7 +275,24 @@ shape to copy), `contextdb` and `iriq` took a subcommand, `rwr` depends on
 `clap_complete` while exposing neither, and `ae`, `inception` and `navi` have
 none. Converge when you next touch one.
 
+## Processes that outlive one call
+
+Daemons, language and MCP servers, detached background workers, and state
+several processes share — choosing the process model, getting upgrades into
+running servers (hot reload), content-addressed and mmap-shared state, garbage
+collection, background-work hygiene, measuring what stays up, and VS Code
+provider integration — are in
+[references/resident-processes.md](references/resident-processes.md). Read it
+before adding a daemon, a `--watch`/`--serve`/`--lsp` mode, or a cache that
+another process reads.
+
 ## Before it ships
+
+- **Sort before you cut.** A list truncated in hash-map order differs between
+  two runs of the same binary, which makes every output diff noise.
+- **Tests that shell out to git clear `GIT_DIR`, `GIT_WORK_TREE` and
+  `GIT_INDEX_FILE`**, or a gate run under `git rebase --exec` writes fixtures
+  into the real repository.
 
 - **Run every example in the README** and diff against actual output — they
   drift silently and compound across releases.
