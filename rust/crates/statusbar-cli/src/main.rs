@@ -104,7 +104,10 @@ fn main() {
 fn load_label(session_id: Option<&str>, session_name: Option<&str>) -> Option<String> {
     let id = session_id.filter(|id| {
         // It lands in a path, so refuse anything that isn't a plain id.
-        !id.is_empty() && id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+        !id.is_empty()
+            && id
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
     })?;
     let path = cache_dir("statusbar").join("labels").join(id);
     let text = std::fs::read_to_string(path).ok()?;

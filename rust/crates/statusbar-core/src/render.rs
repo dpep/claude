@@ -394,8 +394,7 @@ mod tests {
             plain(&wt, &env(Some("feature")), &Config::default()),
             "/tmp/x (wt) · feature"
         );
-        let plain_checkout =
-            Session::parse(r#"{"workspace": {"current_dir": "/tmp/x"}}"#);
+        let plain_checkout = Session::parse(r#"{"workspace": {"current_dir": "/tmp/x"}}"#);
         assert_eq!(
             plain(&plain_checkout, &env(Some("feature")), &Config::default()),
             "/tmp/x · feature"
@@ -496,16 +495,21 @@ mod tests {
         );
         let mut e = env(Some("main"));
         e.label = Some("statusbar session labels");
-        assert_eq!(plain(&s, &e, &Config::default()), "/tmp/x · [statusbar session labels]");
+        assert_eq!(
+            plain(&s, &e, &Config::default()),
+            "/tmp/x · [statusbar session labels]"
+        );
         e.label = Some("a label long enough to need capping");
-        assert_eq!(plain(&s, &e, &Config::default()), "/tmp/x · [a label long enough to…]");
+        assert_eq!(
+            plain(&s, &e, &Config::default()),
+            "/tmp/x · [a label long enough to…]"
+        );
     }
 
     #[test]
     fn session_name_is_used_when_there_is_no_label() {
-        let s = Session::parse(
-            r#"{"workspace": {"current_dir": "/tmp/x"}, "session_name": "review"}"#,
-        );
+        let s =
+            Session::parse(r#"{"workspace": {"current_dir": "/tmp/x"}, "session_name": "review"}"#);
         assert_eq!(
             plain(&s, &env(Some("main")), &Config::default()),
             "/tmp/x · [review]"
@@ -537,9 +541,8 @@ mod tests {
 
     #[test]
     fn session_still_accepts_the_bare_bool() {
-        let s = Session::parse(
-            r#"{"workspace": {"current_dir": "/tmp/x"}, "session_name": "short"}"#,
-        );
+        let s =
+            Session::parse(r#"{"workspace": {"current_dir": "/tmp/x"}, "session_name": "short"}"#);
         let on = Config::parse(r#"{"session": true}"#);
         assert_eq!(plain(&s, &env(Some("main")), &on), "/tmp/x · [short]");
         let off = Config::parse(r#"{"session": false}"#);
@@ -554,7 +557,11 @@ mod tests {
         let cfg = Config::parse(r#"{"branch": {"strip_handle": false}}"#);
         let s = Session::parse(r#"{"workspace": {"current_dir": "/tmp/x"}}"#);
         assert_eq!(
-            plain(&s, &env(Some("dpep/statusbar-truncate-long-segments")), &cfg),
+            plain(
+                &s,
+                &env(Some("dpep/statusbar-truncate-long-segments")),
+                &cfg
+            ),
             "/tmp/x · dpep/statusbar-truncate…"
         );
     }
