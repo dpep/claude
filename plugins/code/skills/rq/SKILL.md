@@ -61,6 +61,9 @@ rq.
   it; a low value or several close results, disambiguate (add a kind, scope, or
   path).
 - `total` is how many matches the results were drawn from, before `-l`.
+- `source` is `live` when rq answered from a bounded scan of a directory it
+  doesn't index (outside a git repo), `index` otherwise. Asking there often?
+  `rq --index <dir>` once.
 - Fields that don't apply (`parent`, `visibility`, `end_line`, …) are omitted,
   never `null`. `declarations` and `also_in` appear when one name is declared in
   several places (a reopened module) and rq folded them into one result.
@@ -76,12 +79,16 @@ On a miss, JSON is one `{"status": …, "query": …}` object, not results:
   before answering.
 - `interrupted` (exit 2) — indexing was stopped; run again.
 
-An error is JSON too, on stdout: `{"error": "…", "kind": "usage", "code": 1}`,
-where `kind` is `usage`, `database`, `not_found`, `index` or `internal`. Check for
-an `error` key before reading results. A `usage` error means fix the command (an
-unknown `-k`, a bad `--wait`, `--json` on piped queries); don't retry it
-unchanged. `code` is the exit code, and an unparseable command line exits `2`
-just like `warming`, so **read `kind` or `status`, never the number.**
+An error is JSON too, on stdout: `{"error": "…", "kind": "usage", "code": 64}`.
+Check for an `error` key before reading results. `code` is the exit code, and
+each means one thing:
+
+- `64` `usage` — fix the command (an unknown `-k`, a bad `--wait`, `--json` on
+  piped queries); don't retry it unchanged.
+- `66` `not_found` — the file you named (`--symbols`) doesn't exist.
+- `69` `no_remote`/`launch` — nothing to hand off to (`-w` with no git host).
+- `70` `internal` — a bug in rq.
+- `74` `database`/`index` — the index can't be opened, read or written.
 
 ## Scope when you know more
 
