@@ -39,6 +39,13 @@ format once, render through one module, and keep field names stable: consumers
 parse them, so a rename is a breaking change and belongs in the changelog as
 one. New commands and fields get structured output in the same change.
 
+**`--ndjson` means one row per line, for every row set.** A command whose
+answer is a list (references, candidates, symbols) writes each row as its own
+line — the same object as its element in the `--json` array — and ends with one
+summary line carrying the rest of the answer. One line holding a nested array
+is JSON with the newlines removed, not NDJSON: `jq -c` per line and streaming
+consumers both break on it.
+
 ## stdout is data, stderr is everything else
 
 Logging, progress, warnings, and telemetry go to stderr through a logger, never
@@ -146,6 +153,11 @@ from scattering dotfiles. Add the env var late and every existing test has
 already grown its own `--db`. Print the resolved path in `--status` with `~`
 unexpanded — the reader wants to recognize it, not paste it.
 
+**Refuse a relative path.** A relative `$TOOL_DB` resolves against each process's
+working directory, so every directory silently gets its own empty store —
+including the detached child a query spawns. Exit 64 naming the variable and
+suggesting `$PWD/…`; treat an empty value as unset; reject a trailing `/`.
+
 ## Long-lived state needs lifecycle commands
 
 Cache and index state goes wrong, and the user needs to act on it without first
@@ -171,6 +183,41 @@ is wrong, so it drops into a container probe or a `&&` chain. Have it report
 what the tool integrates with — which editors have the exported dictionary,
 whether a config was found — or "did it install?" is unanswerable without going
 to look.
+
+## State survives upgrades, downgrades and damage
+
+A store that outlives the binary will meet a binary that doesn't match it: an
+upgrade, a downgrade, two versions installed side by side (a package manager's
+and a dev build), a crash mid-write, a full disk. The user must never be left
+holding an error only a manual `rm` fixes.
+
+- **Stamp two versions.** The schema version (SQLite's `user_version`) says what
+  the file holds; the tool version that last wrote it — and created it — says who.
+  The second is what turns "no such column" into "written by rq 0.61.0".
+- **Forward: migrate, and fall back to rebuilding.** Migrate in one transaction,
+  re-reading the version under the write lock so concurrent openers don't both
+  migrate. On *any* failure — a migration error, "file is not a database",
+  "malformed", a failed `quick_check` — move the file aside (with its `-wal` and
+  `-shm`; keep the latest copy only) and rebuild. Say it once, on stderr:
+  what failed, that it's rebuilding, where the old file went. A derived index
+  can always be regenerated; a broken one can't be reasoned with.
+- **Backward: never destroy a newer store.** An older binary that wipes what it
+  doesn't understand starts a ping-pong with the newer one, each rebuilding
+  over the other. Refuse clearly, or better, give the older binary its own
+  side file (`tool.v22.db`) and warn once. `--status` shows side files; `--gc`
+  removes them.
+- **Say what a long upgrade is doing.** A one-time migration on a large store
+  takes seconds and holds the write lock: other processes should wait for it
+  (a longer busy timeout while the version is behind), and one of them should
+  print "upgrading the index (one-time)…" — not exit with "database is locked".
+- **Resident processes recover too.** A language server or background worker
+  holding the old store must notice it changed underneath (re-check the version
+  per write), refuse to write old-format data into a new store, and reopen or
+  hand off — not answer errors until restarted. See
+  [resident-processes.md](references/resident-processes.md).
+- **Test every path.** A corrupt file, a truncated one, a migration that fails
+  midway (inject it), a newer-schema store, two versions alternating on one
+  path, and several openers of a broken store at once.
 
 ## Non-blocking is a mode, not a timeout
 
@@ -292,7 +339,10 @@ another process reads.
   two runs of the same binary, which makes every output diff noise.
 - **Tests that shell out to git clear `GIT_DIR`, `GIT_WORK_TREE` and
   `GIT_INDEX_FILE`**, or a gate run under `git rebase --exec` writes fixtures
-  into the real repository.
+  into the real repository. So does the tool, if it picked its repository by
+  walking up to `.git`: an inherited `GIT_DIR` must not send its own git calls
+  somewhere else. Prove it by running the suite with `GIT_DIR` pointed at a
+  path that doesn't exist.
 
 - **Run every example in the README** and diff against actual output — they
   drift silently and compound across releases.
