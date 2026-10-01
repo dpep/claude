@@ -27,8 +27,9 @@ rq <name> --json
 ```
 
 Reading the definition rather than just locating it? Use `--show`. When the top
-match's confidence is at least 0.85 it adds a `body` field with the full source;
-otherwise it returns the ranked list. It also tells rq which definition you
+match's confidence is at least 0.85 (before a `warming` result scales it down
+for the share read) it adds a `body` field with the full source; otherwise it
+returns the ranked list. It also tells rq which definition you
 used, which is how ranking improves for this repo — prefer it over a search
 followed by a separate file read:
 
@@ -66,6 +67,11 @@ rq.
   repo asked with `--no-wait` before its first index finished. `index`
   otherwise. The hit is real; its ranking is provisional. Asking outside a repo
   often? `rq --index <dir>` once.
+- `warming` (`{read, of, interrupted, hint}`) means the repo's index is still
+  being built: `read` of `of` files are in. Another definition may not be
+  indexed yet, and `confidence` is scaled down to match (to 0 when `of` is
+  missing: outside git nothing counts the tree). Use the answer; if it
+  matters, ask again once indexing finishes (`hint` says how).
 - Fields that don't apply (`parent`, `visibility`, `end_line`, …) are omitted,
   never `null`. `declarations` and `also_in` appear when one name is declared in
   several places (a reopened module) and rq folded them into one result.
@@ -80,7 +86,13 @@ On a miss, JSON is one `{"status": …, "query": …}` object, not results:
 - `scope_not_found` (exit 1) — nothing inside the scope you named; `found_in`
   says where the name does live. Re-ask with that scope.
 - `warming` (exit 2) — index incomplete; retry. Mostly after `--no-wait`;
-  otherwise rq indexes a cold repo before answering.
+  otherwise rq indexes a cold repo before answering. Its `warming` field says
+  how far indexing got. When it found something a
+  file not read yet could beat, the matches so far are in `provisional`: a
+  lead, not an answer. (Under `-a`, a match from another checkout nothing is
+  indexing answers instead, with `warming.interrupted` and the `rq --index`
+  that finishes it: asking again wouldn't change it. One another process is
+  still indexing holds back every checkout's match, and the search waits on it.)
 - `interrupted` (exit 2) — indexing was stopped; run again.
 
 An error is JSON too, on stdout: `{"error": "…", "kind": "usage", "code": 64}`.
