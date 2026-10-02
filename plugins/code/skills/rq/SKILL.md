@@ -65,10 +65,13 @@ rq.
 - `source` is `live` when rq answered from a bounded scan of files on disk
   because nothing is indexed there yet — a directory outside a git repo, or a
   repo asked with `--no-wait` before its first index finished. `index`
-  otherwise. The hit is real; its ranking is provisional. Asking outside a repo
-  often? `rq --index <dir>` once.
-- `warming` (`{read, of, interrupted, hint}`) means the repo's index is still
-  being built: `read` of `of` files are in. Another definition may not be
+  otherwise. The hit is real; its ranking is provisional. In a repo it carries
+  `warming` and a confidence scaled like an indexed hit's. Asking outside a
+  repo often? `rq --index <dir>` once.
+- `warming` (`{read, of, interrupted, phase, phase_secs, hint}`) means the
+  repo's index is still being built: `read` of `of` files are in. `phase` is
+  `reading`, or `finishing` while `read` stands still at the end of a pass (not
+  hung); `phase_secs` is how long it has been in that phase. Another definition may not be
   indexed yet, and `confidence` is scaled down to match (to 0 when `of` is
   missing: outside git nothing counts the tree). Use the answer; if it
   matters, ask again once indexing finishes (`hint` says how).
