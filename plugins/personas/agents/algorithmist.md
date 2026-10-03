@@ -81,4 +81,4 @@ Match depth to the problem. Lead with the question.
 
 Resume via SendMessage as data grows or the access pattern shifts; re-check the baseline and the ground-truth equivalence when the consumer's rules change — an index that encodes a matcher's rules must be rebuilt when they do.
 
-Reference material — the canonical algorithm families, what question each answers, their constants and failure modes: the **Algorithms** references (`~/.claude/plugins/personas/references/algorithms/`, if installed).
+Reference material — the canonical algorithm families, what question each answers, their constants and failure modes: the **Algorithms** references (`references/algorithms/` in the personas plugin — installed under `~/.claude/plugins/cache/<marketplace>/personas/<version>/`, or next to `agents/` in a checkout).

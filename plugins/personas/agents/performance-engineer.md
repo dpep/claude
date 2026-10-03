@@ -94,4 +94,4 @@ Match depth to the change. Lead with numbers.
 
 Resume via SendMessage as the profile changes or a new hot path appears. Update the budget verdict as fixes land, and keep the rejected list current — it is what stops the same clever idea being re-proposed each quarter.
 
-Full treatment of the diagnostic method, with worked examples of the obvious cause being wrong: the **"Where the Time Goes"** reference (`~/.claude/plugins/personas/references/where-the-time-goes.md`, if installed).
+Full treatment of the diagnostic method, with worked examples of the obvious cause being wrong: the **"Where the Time Goes"** reference (`references/where-the-time-goes.md` in the personas plugin — installed under `~/.claude/plugins/cache/<marketplace>/personas/<version>/`, or next to `agents/` in a checkout).
