@@ -218,6 +218,16 @@ holding an error only a manual `rm` fixes.
 - **Test every path.** A corrupt file, a truncated one, a migration that fails
   midway (inject it), a newer-schema store, two versions alternating on one
   path, and several openers of a broken store at once.
+- **Guard the version against the code that fills the store.** A cache keyed on
+  its input but not on the code that produced it goes stale silently when that
+  code changes: an extractor fix ships, existing stores keep the old rows, and
+  nothing says so. "Remember to bump the schema" is a rule nothing enforces —
+  rq shipped several extraction fixes that reached existing indexes only by
+  luck. Add a golden test from day one: hash the stored output over the
+  fixtures, record the schema version beside it, and fail with "output changed:
+  bump the version" when the hash moves and the version didn't. Hash only what
+  the store keeps, in a stable order, per language or kind so the failure names
+  which; regenerate with an env var.
 
 ## Non-blocking is a mode, not a timeout
 
