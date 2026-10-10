@@ -24,6 +24,12 @@ Programming workflow & code-navigation skills. No hooks; the `rq` and `gqls` ski
   `target/` dirs, stale `node_modules`/virtualenvs, finished agent worktrees,
   merged branches, and package/updater caches. Drives `code-gc`, a bash script
   in `bin/` that only reports unless given `--apply`.
+- **observability** — dig through production telemetry (traces, logs, metrics,
+  continuous profiles, Datadog) for evidence for or against a hypothesis, or,
+  when the evidence doesn't exist, name the instrumentation that would produce
+  it. Org-specific knowledge (services, dashboards, saved queries, gotchas)
+  stays out of the skill, in a private notes doc at `~/.claude/docs/observability.md`
+  that the skill creates from a template and adds to as it learns.
 
 Will grow to cover review, testing, and language-specific patterns.
 
