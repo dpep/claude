@@ -1,7 +1,7 @@
 //! The pure render: session JSON + `Env` + config → the ANSI status line.
 //!
 //! Segment order, left to right:
-//!   cwd · wt:<worktree> · <ref> · #<pr> · [session] · <model> · ctx:N% · rate:N% (Nm)
+//!   cwd · wt:<worktree> · <ref> · #<pr> · <session> · <model> · ctx:N% · rate:N% (Nm)
 //!
 //! `<ref>` is the branch, or the PR number when `pr.prefer_over_branch`
 //! is set and a PR is present. Each segment is independently gated by
@@ -86,7 +86,7 @@ pub fn render(s: &Session, env: &Env, cfg: &Config) -> String {
         if let Some(name) = env.label.or(s.session_name.as_deref()) {
             if !name.is_empty() {
                 let name = truncate(name, cfg.session.max_len);
-                parts.push(format!("{DIM}[{name}]{RESET}"));
+                parts.push(format!("{DIM}{name}{RESET}"));
             }
         }
     }
@@ -497,12 +497,12 @@ mod tests {
         e.label = Some("statusbar session labels");
         assert_eq!(
             plain(&s, &e, &Config::default()),
-            "/tmp/x · [statusbar session labels]"
+            "/tmp/x · statusbar session labels"
         );
         e.label = Some("a label long enough to need capping");
         assert_eq!(
             plain(&s, &e, &Config::default()),
-            "/tmp/x · [a label long enough to…]"
+            "/tmp/x · a label long enough to…"
         );
     }
 
@@ -512,7 +512,7 @@ mod tests {
             Session::parse(r#"{"workspace": {"current_dir": "/tmp/x"}, "session_name": "review"}"#);
         assert_eq!(
             plain(&s, &env(Some("main")), &Config::default()),
-            "/tmp/x · [review]"
+            "/tmp/x · review"
         );
     }
 
@@ -523,7 +523,7 @@ mod tests {
         );
         assert_eq!(
             plain(&s, &env(Some("main")), &Config::default()),
-            "/tmp/x · [PR code-ref linking in…]"
+            "/tmp/x · PR code-ref linking in…"
         );
     }
 
@@ -535,7 +535,7 @@ mod tests {
         );
         assert_eq!(
             plain(&s, &env(Some("main")), &cfg),
-            "/tmp/x · [PR code-ref linking in /code:git skill]"
+            "/tmp/x · PR code-ref linking in /code:git skill"
         );
     }
 
@@ -544,7 +544,7 @@ mod tests {
         let s =
             Session::parse(r#"{"workspace": {"current_dir": "/tmp/x"}, "session_name": "short"}"#);
         let on = Config::parse(r#"{"session": true}"#);
-        assert_eq!(plain(&s, &env(Some("main")), &on), "/tmp/x · [short]");
+        assert_eq!(plain(&s, &env(Some("main")), &on), "/tmp/x · short");
         let off = Config::parse(r#"{"session": false}"#);
         assert_eq!(plain(&s, &env(Some("main")), &off), "/tmp/x");
         // and the bool form must not disturb its neighbours in the same file
@@ -637,7 +637,7 @@ mod tests {
         );
         assert_eq!(
             plain(&s, &env(Some("feat")), &cfg),
-            "~/projects (wt) · feat · #474 · [rv] · Opus · ctx:85% · rate:92% (20m)"
+            "~/projects (wt) · feat · #474 · rv · Opus · ctx:85% · rate:92% (20m)"
         );
     }
 

@@ -23,7 +23,7 @@ pub struct Config {
     pub pr: PrConfig,
     /// Show a dim `wt:<name>` when the worktree differs from the branch.
     pub worktree: bool,
-    /// Show a dim `[name]` when the session is named.
+    /// Show the name, dim, when the session is named.
     pub session: SessionConfig,
     pub rate_limit: RateConfig,
     pub context_window: ContextConfig,

@@ -1,6 +1,6 @@
 {
   "name": "statusbar",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "A compact, configurable Claude Code status line — cwd, branch/PR, session, model, context-window, and rate-limit segments rendered from the session JSON.",
   "author": {
     "name": "Daniel Pepper",

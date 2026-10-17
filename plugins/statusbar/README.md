@@ -5,7 +5,7 @@ state as JSON to a status-line command every ~10s; statusbar renders it into a
 tidy bar of `·`-joined segments with ANSI color.
 
 ```
-~/code/lib/claude (wt) · example-api · [review] · ctx:72% · rate:88% (14m)
+~/code/lib/claude (wt) · example-api · review · ctx:72% · rate:88% (14m)
 ```
 
 ## What it renders
@@ -19,7 +19,7 @@ config toggle is on:
 | **worktree** (dim) | `(wt)` on the path when the checkout is a worktree — the fact, not the name | on |
 | **ref** | the git branch, or the **PR number** in its place (see below) | on |
 | **pr** | `#<number>`, colored green/red by review state | on (when PR open) |
-| **session** (dim) | `[<name>]` — your name, else the auto label, else Claude Code's; capped at 24 | on |
+| **session** (dim) | `<name>` — your name, else the auto label, else Claude Code's; capped at 24 | on |
 | **model** (dim) | the model family — `Opus 5 (1M context)` → `Opus` | off |
 | **context** | `ctx:N%` of the context window used; yellow near compaction | on ≥50% |
 | **rate** | `rate:N% (Nm)` of the 5-hour quota + reset countdown; yellow/red | on ≥70% |
