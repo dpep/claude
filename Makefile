@@ -36,6 +36,7 @@ test:
 	cd rust && cargo test --workspace
 	bash script/find-gem-test.sh
 	bash script/code-gc-test.sh
+	claude plugin test plugins/quiet-mode
 
 fmt:
 	cd rust && cargo fmt --all

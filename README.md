@@ -69,6 +69,13 @@ too long", "stop showing PRs" — and the `statusbar-config` skill knows which
 key that is, where the config file lives, and how to render the result back to
 you without waiting for a refresh.
 
+### `quiet-mode`
+
+A mod that quiets the terminal UI: no whimsical spinner verb, no end-of-turn
+line, no mode-cycle hint or agent count in the footer. The footer shows the
+last turn's duration instead. Needs a Claude Code build that loads mods; see
+[its README](plugins/quiet-mode/README.md) for what it can't reach.
+
 ### `datasets`
 
 Curated reference data Claude can find: markdown, CSV, TSV, JSON or YAML under

@@ -21,6 +21,11 @@
       "description": "A compact, configurable status line — cwd, git branch/PR, session, model, context-window and rate-limit, rendered from a small Rust binary built in this repo."
     },
     {
+      "name": "quiet-mode",
+      "source": "./plugins/quiet-mode",
+      "description": "A mod that quiets the terminal UI — drops the spinner's whimsical verb, the end-of-turn line, the mode-cycle hint and the agent count, and shows the last turn's duration in the footer. Needs a Claude Code build that loads mods."
+    },
+    {
       "name": "datasets",
       "source": "./plugins/datasets",
       "description": "Keep curated reference data where Claude can find it — markdown/csv/tsv/json/yaml files under ~/.claude/datasets with frontmatter for discovery, plus slash commands and a skill to create, list, search and show them. No binary; nothing to build."

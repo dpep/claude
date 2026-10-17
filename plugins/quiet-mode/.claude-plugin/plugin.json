@@ -1,0 +1,11 @@
+{
+  "name": "quiet-mode",
+  "version": "0.1.0",
+  "description": "Quiets Claude Code's terminal chrome — drops the spinner's whimsical verb, the end-of-turn line, the mode-cycle hint and the agent count, and shows the last turn's duration in the footer.",
+  "author": {
+    "name": "Daniel Pepper",
+    "url": "https://github.com/dpep"
+  },
+  "homepage": "https://github.com/dpep/claude/tree/main/plugins/quiet-mode",
+  "license": "MIT"
+}
