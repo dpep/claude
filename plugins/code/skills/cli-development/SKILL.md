@@ -13,6 +13,34 @@ rather than all of them, logging that went to stdout and now can't move without
 breaking a consumer. Shared across `rq`, `ae`, and `vocab`: the consistency is
 the point, so the second tool costs nothing to learn.
 
+## Optimize for the person using it
+
+A CLI should be intuitive to use: someone gets it right the first time.
+Everything below is the floor. When implementation ease and user clarity pull
+apart, clarity wins.
+
+- **Safe by default.** Anything lossy or irreversible takes an explicit flag.
+  A resize writes a copy unless told to replace the original.
+- **Honest labels.** Say what happened in the user's terms, not by internal
+  state. A conversion that had to re-encode is "converted", not the
+  "perceptual" mode they never asked for.
+- **Numbers carry meaning.** A bare `80` reads as "quality 80?". Name the
+  scale: `target80` is a score, `q91` the encoder setting it produced.
+- **Reversible, or honest that it isn't.** Record what undo needs at the
+  moment of change; some of it, like where the Trash put a file, can't be
+  rebuilt later. Undo refuses rather than guesses, and says why.
+- **Reruns are safe.** A second pass mustn't compound the first: no double
+  rotation, no suffix on a suffix. Mark your own work and recognize it.
+- **Accept what people type.** Presets beside raw numbers (`--size web` or
+  `--size 2048`). An unknown value lists the valid ones.
+- **Brief, actionable errors.** Say what to do next, not what's already on
+  screen. An error on a row that names the file needn't repeat its path.
+- **One source of truth for settings.** A CLI and its GUI read and write the
+  same config, or their defaults drift.
+
+When unsure, walk the default path as a newcomer. Fix what surprises you in
+the tool, not the docs.
+
 ## The flag spine
 
 Every tool carries these, with the same letters:
