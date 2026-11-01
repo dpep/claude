@@ -91,7 +91,7 @@ Two questions keep it honest:
 
 The reflex worth building: **look for the version that keeps the seam.** It is often available and usually smaller — share the repeated string, borrow instead of clone, reuse the buffer. If the contained version gets most of the win, the invasive one needed a much better argument than it had.
 
-## 9. Rust and SQL notes
+## 9. Rust, SQL and Rails notes
 
 The structural costs from §1 have a small number of recurring shapes. These are the ones worth recognising on sight.
 
@@ -110,6 +110,11 @@ The structural costs from §1 have a small number of recurring shapes. These are
 - **Filter the small table first, then seek the large one.** Testing a predicate on a joined column while scanning the big table cost 29 ms; narrowing on the 3,000-row table and seeking its children cost 0.4 ms, same rows.
 - **`EXPLAIN QUERY PLAN`, on the real statement.** `SCAN` versus `SEARCH` is the whole tell. Run it on the query the code actually issues — a simplified version without the joins plans differently and will mislead you.
 - **A leading `%` can never use an index.** Don't optimize the pattern; reduce what it runs against.
+
+**Rails**
+
+- **Find N+1s with Prosopite; rank them with production traces.** Prosopite flags the same query shape repeated from one call site, rather than watching association loads the way Bullet does, so it misses fewer and cries wolf less. Run it in the test suite with `Prosopite.raise = true` so a new N+1 fails a spec instead of shipping.
+- **A detector says an N+1 exists, not that it costs anything.** One over three rows is noise; one over a page of results on the busiest endpoint is the bill. APM traces (Datadog, or whatever the app runs) show which ones actually spend request time in production — fix those first, and don't let a detector's list set the order.
 
 ## 10. Know the budget, and stop when you're inside it
 
