@@ -34,6 +34,21 @@ The throughline: respect the reader's time and attention. Every word earns its p
 - **Messages (Slack / comments / email)** — get to the ask in the first line. Respect that the reader is busy and skimming on a phone.
 - **Release notes / changelogs** — user-facing benefit first, mechanism second. What changed for *them*.
 
+## Docs readers act on (runbooks, references, READMEs, agent instructions)
+
+When the reader will *do* something with the doc, and especially when the reader is an agent, clarity beats voice. Here the rules tighten, borrowing from ASD-STE100 Simplified Technical English, a controlled language built for manuals that must not be misread:
+
+- **One term per idea, everywhere.** Pick "partner app" and never write "integration" or "client app" for the same thing. Synonyms read as different things and break search. This overrides the schoolroom urge to vary your words.
+- **Condition first, then the instruction.** "If the build fails, check the lockfile," not "Check the lockfile if the build fails."
+- **One instruction per sentence.** Split anything with "and then."
+- **Procedures as numbered steps; comparisons as tables.** Prose hides order and differences.
+- **Single-word verbs over phrasal ones** where a precise one exists: "install" over "set up," "remove" over "take out." Phrasal verbs are idioms, and idioms are where non-native readers and models guess. (This is the one place a Latin word can beat a Saxon one.)
+- **Present tense, current behavior.** Drop "used to" and "no longer"; history belongs in git and PRs.
+- **Date and source anything that can go stale.** "As of 2026-11-01," with a link.
+- **Lead with surprises.** A short "rules that surprise people" list up top does more work than any long section.
+- **Route by symptom.** Readers arrive with a problem, not a table of contents; a "symptom → first check" table meets them there.
+- **Test with a fresh reader.** Hand real questions to someone who has only the doc. A subagent with no other context is ideal. Where it stalls or guesses, content is missing.
+
 ## House conventions (configurable — this is the default owner's setup)
 
 - **Chat output meant for copy/paste**: no word-wrapping, no padding spaces, no bold section headers; format URLs as clickable markdown links. (Inside a *document*, PR body, or ticket, use the formatting that medium expects — these lean rules are for replies, not artifacts.)
@@ -47,7 +62,7 @@ When you don't know a convention (a different repo, another person's voice), ask
 ## Two modes
 
 - **Draft** — produce the artifact from raw material: read the diff / notes / thread, find the reader and the point, and write it tight in the voice above.
-- **Wordsmith** — sharpen an existing draft. Cut filler and hedging, fix flow and rhythm, kill passive voice and buried ledes, fix grammar — but **preserve the author's voice**; tighten it, don't homogenize it into yours. Show the result; on request, explain the notable changes or offer them as suggestions rather than a rewrite.
+- **Wordsmith** — sharpen an existing draft. Cut filler and hedging, fix flow and rhythm, kill passive voice and buried ledes, fix grammar — but **preserve the author's voice**; tighten it, don't homogenize it into yours. A careful language pass doubles as a consistency audit: when two passages (or two files) name or describe the same thing differently, check whether they actually disagree. If they do, flag the conflict rather than quietly picking a side. Show the result; on request, explain the notable changes or offer them as suggestions rather than a rewrite.
 
 ## The questions you always ask
 
