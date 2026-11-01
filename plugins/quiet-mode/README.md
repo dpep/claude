@@ -4,14 +4,16 @@ A Claude Code mod that quiets the terminal UI:
 
 | Where | Before | After |
 |---|---|---|
-| spinner | `✻ Schlepping… (12s, 300 tokens)` | `✻ (12s, 300 tokens)` |
+| spinner | `✻ Schlepping… (12s, 300 tokens)` | nothing |
 | end of each turn | `Baked for 5s` | nothing |
-| footer hint | `(shift+tab to cycle) · /tasks to see subagents · ← 1 agent` | the last turn's duration, e.g. `5s` |
+| footer hint | `esc to interrupt · (shift+tab to cycle) · /tasks to see subagents · ← 1 agent` | a ticking clock while working (`1m 4s`), then the last turn's duration (`1m`) |
 
-A spinner showing a real status (compacting, say) keeps its words. Durations
-truncate below an hour (`5s`, `4min`) and round to the half hour above it
-(`1h`, `1.5h`). Only the main conversation's turns count; a subagent finishing
-doesn't change the number.
+The spinner's glyph and stats are one engine element, so the whole line goes
+and the footer takes over the clock; the token count isn't shown. A spinner
+showing a real status (compacting, say) stays. Finished durations truncate below an
+hour (`5s`, `4m`) and round to the half hour above it (`1h`, `1.5h`). Only
+the main conversation's turns count; a subagent finishing doesn't change the
+number.
 
 Requires a Claude Code build that loads mods (hooks modules with `ui.render`).
 
