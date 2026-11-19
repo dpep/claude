@@ -14,7 +14,7 @@ This plugin is four hooks and a skill that wire sessions to the
 ## Install
 
 ```sh
-cargo install inkling-dev
+brew install dpep/tools/inkling   # or: cargo install inkling-dev
 ```
 
 ```

@@ -84,7 +84,7 @@ session touches, and a resident process pushes each change in as one line, so
 the session never polls. Needs the `inkling` CLI (macOS and Linux):
 
 ```sh
-cargo install inkling-dev
+brew install dpep/tools/inkling   # or: cargo install inkling-dev
 ```
 
 See [its README](plugins/inkling/README.md).
