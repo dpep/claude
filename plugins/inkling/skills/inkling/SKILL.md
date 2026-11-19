@@ -32,7 +32,7 @@ them must get there. `--json` for a script.
 ```sh
 inkling watch github.com/owner/repo#12   # or a PR URL
 inkling watch PROJ-123                   # Jira: a key or a browse URL
-inkling watch https://x.slack.com/archives/C0123/p1786596050245879   # a Slack message
+inkling watch https://acme.slack.com/archives/C0123ABCD/p1786596050245879   # a Slack message
 inkling watch '#incidents' --ttl 7d      # a whole Slack channel (quote the #)
 inkling watch                            # list what's watched
 inkling unwatch <ref>
