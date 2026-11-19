@@ -1,8 +1,8 @@
 # dpep/claude
 
 A [Claude Code](https://claude.com/claude-code) plugin marketplace: code
-navigation, a bench of opinionated agents, a status line, and a couple of small
-conveniences.
+navigation, a bench of opinionated agents, a status line, news for agents, and
+a couple of small conveniences.
 
 ```
 /plugin marketplace add dpep/claude
@@ -75,6 +75,19 @@ A mod that quiets the terminal UI: no whimsical spinner verb, no end-of-turn
 line, no mode-cycle hint or agent count in the footer. The footer shows the
 last turn's duration instead. Needs a Claude Code build that loads mods; see
 [its README](plugins/quiet-mode/README.md) for what it can't reach.
+
+### `inkling`
+
+Tells a session when a pull request, Jira issue or Slack conversation it cares about
+changes: CI went red, a review landed, someone replied. Hooks watch what the
+session touches, and a resident process pushes each change in as one line, so
+the session never polls. Needs the `inkling` CLI (macOS and Linux):
+
+```sh
+cargo install inkling-dev
+```
+
+See [its README](plugins/inkling/README.md).
 
 ### `datasets`
 

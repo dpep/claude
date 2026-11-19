@@ -1,0 +1,50 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/check-installed.sh"
+          },
+          {
+            "type": "command",
+            "command": "command -v inkling >/dev/null 2>&1 && inkling hook session-start || true"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v inkling >/dev/null 2>&1 && inkling hook session-end || true"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v inkling >/dev/null 2>&1 && inkling hook prompt || true"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash|mcp__claude_ai_Slack__slack_send_message|mcp__claude_ai_Slack__slack_add_reaction",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v inkling >/dev/null 2>&1 && inkling hook post-tool || true",
+            "async": true
+          }
+        ]
+      }
+    ]
+  }
+}

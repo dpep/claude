@@ -1,0 +1,11 @@
+{
+  "name": "inkling",
+  "version": "0.3.0",
+  "description": "Tells a session when a pull request, Jira issue or Slack message it cares about changes, via inkling (github.com/dpep/inkling). Hooks subscribe each session and watch what it touches; a resident inkling pushes the news in, even to an idle session. A skill teaches watch, events and wait, and how to read what arrives. No polling loops.",
+  "author": {
+    "name": "Daniel Pepper",
+    "url": "https://github.com/dpep"
+  },
+  "homepage": "https://github.com/dpep/claude/tree/main/plugins/inkling",
+  "license": "MIT"
+}

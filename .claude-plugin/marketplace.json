@@ -29,6 +29,11 @@
       "name": "datasets",
       "source": "./plugins/datasets",
       "description": "Keep curated reference data where Claude can find it — markdown/csv/tsv/json/yaml files under ~/.claude/datasets with frontmatter for discovery, plus slash commands and a skill to create, list, search and show them. No binary; nothing to build."
+    },
+    {
+      "name": "inkling",
+      "source": "./plugins/inkling",
+      "description": "Tells a session when a pull request, Jira issue or Slack message it cares about changes, via inkling (github.com/dpep/inkling). Hooks subscribe each session and watch what it touches; a resident inkling pushes the news in. Skill plus four hooks; no polling loops."
     }
   ]
 }
