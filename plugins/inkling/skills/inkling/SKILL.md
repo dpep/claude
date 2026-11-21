@@ -92,8 +92,12 @@ Look the command up here instead of working out what happened:
 A job's log is ready as soon as that job ends. Don't swap in `gh run view
 --log-failed`: it refuses until every job in the run has finished.
 
-Replies and reactions you made from this session are receipts, not news. The
-user answering from their phone under the same Slack account is news.
+Replies and reactions you made from this session are receipts, not news, and
+so are merges, closes, approvals and Jira transitions you ran (`gh pr merge`,
+`acli jira workitem transition`): they wait in `inkling events` rather than
+arriving as a turn. `gh pr merge --auto` is the exception — that merge is
+pushed when it lands. The user answering from their phone under the same
+Slack account is news.
 Reactions carry no name. A Slack watch is read at most every 5 minutes, so
 expect that much lag.
 
@@ -102,6 +106,8 @@ expect that much lag.
 A subagent shares its parent's session. The PRs it touches are watched on the
 parent's behalf, and their news goes to the parent, not to you. That's
 deliberate: you have no inbox, and you've often finished before the news lands.
+A merge or transition you run counts as the parent's own, so the parent isn't
+pushed it: say in your report what you merged or moved.
 
 - If you're blocked on something, use `inkling wait`. It works the same here.
 - Never run bare `inkling events`. It advances the parent's cursor, and the
