@@ -65,7 +65,9 @@ messages, reports, and errors included. A consumer that has to parse `list`
 with JSON and `sync` by scraping text will scrape everything. Resolve the
 format once, render through one module, and keep field names stable: consumers
 parse them, so a rename is a breaking change and belongs in the changelog as
-one. New commands and fields get structured output in the same change.
+one. Status text counts too: a script matching `removed` or `not found` breaks
+when they become `removed 2`. New commands and fields get structured output in
+the same change.
 
 **`--ndjson` means one row per line, for every row set.** A command whose
 answer is a list (references, candidates, symbols) writes each row as its own
@@ -165,6 +167,24 @@ require output before EOF. Nothing else catches this, because the output is
 byte-identical either way — which is how it survives review, and how it sat in
 two of our tools for months.
 
+## A second argument form multiplies the edge cases
+
+Accepting `KEY=VALUE` beside `KEY VALUE`, or several pairs instead of one,
+breaks in the same four places:
+
+- **Parse in order; never partition by shape.** Splitting args into `=` ones
+  and bare ones, then chunking the bare ones, pairs words that were never
+  adjacent: `a b=c d` became `a -> d`, exit 0. A bare word pairs with its
+  neighbour or is a usage error.
+- **Every verb on the noun takes every form.** The help advertised `teh=the`,
+  but `--rm teh=the` looked for a key named `teh=the` and quietly removed
+  nothing. The inverse operation is the one nobody tests.
+- **Normalize per field, not per argv.** Lowercasing every argument up front
+  suited the key and broke the value: `CLAUDE.md` came back `claude.md`.
+- **Reject bad shapes before side effects.** Validate in the pre-flight that
+  decides what access the command needs, or a typo opens, creates, migrates
+  or seeds the data before the usage error prints.
+
 ## Where its data lives
 
 Three ways in, in this order of precedence — flag, environment variable, XDG
@@ -211,6 +231,15 @@ is wrong, so it drops into a container probe or a `&&` chain. Have it report
 what the tool integrates with — which editors have the exported dictionary,
 whether a config was found — or "did it install?" is unanswerable without going
 to look.
+
+**An export goes stale when your rules change, not when its file does.**
+Words written into another tool's dictionary under old rules stay there, and
+nothing on disk looks wrong: a typo filter added later left the user's own
+typos whitelisted in macOS for weeks. So `--status` reports, per target, the
+last sync and how much the next one would take back, and the sync names each
+removal and why. Otherwise a real word caught by a new rule surfaces only when
+the other tool starts flagging it. Check expensive drift only for targets that
+were ever written.
 
 ## State survives upgrades, downgrades and damage
 
