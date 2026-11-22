@@ -28,7 +28,7 @@ one stops at the push.
 
 ## Command Shorthands
 
-- `rebase <PR link>` — checkout PR branch, fetch latest main, rebase onto main, resolve conflicts, push
+- `rebase <PR link>` — checkout PR branch, fetch latest main, rebase onto main, resolve conflicts, push. For a PR in review, see the `pull-requests` skill first; a force-push dismisses approvals.
 
 ## Branch Naming
 

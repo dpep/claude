@@ -236,7 +236,7 @@ a squash-merged or rebased PR leaves no ancestry for `--merged` to find, which i
 exactly the case that strands worktrees for months.
 
 Check both refs, because the common end state has only one of them. Merged PR plus
-`delete_branch_on_merge` (the repo convention — see the `github` skill) means
+`delete_branch_on_merge` (a repo setting that deletes the head branch when its PR merges; `gh api repos/{owner}/{repo} --jq .delete_branch_on_merge` shows it) means
 `origin/<branch>` is gone while the PR still holds the commits; a pushed branch
 with no PR yet is the mirror case.
 
