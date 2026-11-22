@@ -38,7 +38,11 @@ before preparing the PR.
    its upstream, so `git push -u origin feature` pushes to `main` and skips the
    PR's CI. Check `git config push.default`, or push with an explicit refspec:
    `git push -u origin HEAD:refs/heads/feature`.
-2. **Open as a draft**, most of all on repos you don't own. Write the body to a
+2. **Have a scribe draft the title and description** (a writing-focused
+   reviewer or agent). Hand it the diff, the goal, and the evidence, and let it
+   write; at minimum, have it review and polish yours before you open the PR
+   or mark it ready. See [Title](#title) and [Description](#description).
+3. **Open as a draft**, most of all on repos you don't own. Write the body to a
    scratch file, e.g. `/tmp/pr-<branch>.md`, never inline: inline bodies hit
    shell quoting.
 
@@ -47,22 +51,40 @@ before preparing the PR.
    gh pr edit <num> --body-file /tmp/pr-<branch>.md
    ```
 
-3. **Mark it ready once CI is green** (`gh pr ready <num>`). A PR isn't ready
+4. **Mark it ready once CI is green** (`gh pr ready <num>`). A PR isn't ready
    for review before that.
-4. Share the PR URL as a link.
+5. Share the PR URL as a link.
 
 ## Title
 
-- Aim for under 50 characters; GitHub truncates around 70.
+- Aim for 2–4 words. GitHub truncates around 70 characters, but a short title
+  is read, not skimmed.
 - Prefix with the ticket key when there is one: `[PROJ-123] Fix validation`.
-- Say what changed, not how. Bad: "Replace sleep 0.1 with proper Capybara wait
-  in onboarding spec". Good: "Fix flaky onboarding spec".
+  The key doesn't count toward the words.
+- Say what changed, not how.
+  - Good: "Fix flaky onboarding spec", "Cache plan lookups".
+  - Bad: "Replace sleep 0.1 with proper Capybara wait in onboarding spec",
+    "Update PlanService to memoize results".
+- A simplification PR leads with 🎯 and the word "Simplify":
+  "🎯 Simplify retry config".
 
 ## Description
 
-- Use `.github/pull_request_template.md` when the repo has one.
-- No AI-attribution footer ("Generated with …") unless the repo's AI policy
-  asks for disclosure.
+Use `.github/pull_request_template.md` when the repo has one, and fit this
+shape into it. Otherwise, in this order:
+
+1. **Goal:** what the PR sets out to accomplish.
+2. **Why:** why the change is warranted or valuable.
+3. **Impact:** the intended or estimated effect, e.g. the expected latency
+   win for a performance change. Link the evidence in the project's
+   observability tool (a Datadog dashboard or query), or say how to validate
+   the hypothesis in production later.
+4. **How to verify:** what a reviewer runs or checks.
+
+For a refactor or other structure-only change, say so explicitly: "No behavior
+changes." Keep the description as small and focused as the change, and link
+every reference (see below). No AI-attribution footer ("Generated with …")
+unless the repo's AI policy asks for disclosure.
 
 ## Link every reference
 

@@ -29,7 +29,7 @@ The throughline: respect the reader's time and attention. Every word earns its p
 ## Document types (how each should read)
 
 - **Notes / minutes** — skimmable. Decisions, open questions, and action items (with owners) up top; discussion below. Capture what future-you will need, not a transcript.
-- **PR descriptions** — *what* changed and, more importantly, *why* (the context a reviewer needs), then how to verify. Small and focused. Link references. Use the repo's PR template if there's one. Note if it was vibed.
+- **PR descriptions** — title in 2–4 words, the effect not the mechanism; a simplification leads with 🎯 and "Simplify" ("🎯 Simplify retry config"). Body in order: the goal, why it's warranted, the intended impact with a way to validate it (an observability link, or how to check in production later), then how to verify. Structure-only changes say "No behavior changes." Small and focused. Link references. Use the repo's PR template if there's one. Note if it was vibed.
 - **JIRA tickets** — the problem or outcome first (not the proposed solution), then acceptance criteria, then repro steps / context. Title carries the project prefix. Phrase resilient to change ("handles the timeout" not "adds a 5s timeout").
 - **Code comments** — what is, not what was or isn't. In someone else's repo, default to adding none. History and rejected alternatives go in the PR body or changelog.
 - **Commit messages** — imperative subject line, tight; the *why* in the body if it isn't obvious from the diff.
