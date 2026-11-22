@@ -26,7 +26,7 @@ age() { find "$1" -exec touch -t 202001010000 {} +; }
 
 # Rust crate with a build dir, plus a bare target/ that isn't Cargo's.
 mkdir -p "$root/crate/target/debug" "$root/site/target"
-touch "$root/crate/Cargo.toml" "$root/crate/target/debug/big"
+touch "$root/crate/Cargo.toml" && echo binary >"$root/crate/target/debug/big"
 
 # One stale JS project, one active Python project.
 mkdir -p "$root/old-js/node_modules/pkg" "$root/live-py/venv/lib"
@@ -78,8 +78,10 @@ refute "branches: skips unmerged" "$out" "  wip"
 "$gc" targets "$root" >/dev/null
 [ -d "$root/crate/target" ] && echo "ok   dry run deletes nothing" || { echo "FAIL dry run deleted"; failures=$((failures + 1)); }
 
-"$gc" targets --apply "$root" >/dev/null
+out=$("$gc" targets --apply "$root")
 [ ! -d "$root/crate/target" ] && [ -d "$root/site/target" ] && echo "ok   targets --apply" || { echo "FAIL targets --apply"; failures=$((failures + 1)); }
+[ ! -L "$tmp/bin/big" ] && [ "$(cat "$tmp/bin/big" 2>/dev/null)" = binary ] && echo "ok   targets --apply: linked binary survives as a copy" || { echo "FAIL linked binary broken"; failures=$((failures + 1)); }
+check "targets --apply: says it copied" "$out" "$(printf 'copied\t%s' "$tmp/bin/big")"
 
 "$gc" deps --apply "$root" >/dev/null
 [ ! -d "$root/old-js/node_modules" ] && [ -d "$root/live-py/venv" ] && echo "ok   deps --apply" || { echo "FAIL deps --apply"; failures=$((failures + 1)); }

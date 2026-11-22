@@ -9,7 +9,8 @@ usage: code-gc <command> [options] [ROOT...]     (ROOT defaults to .)
 
   survey                     sizes of everything below, one line per category
   targets   [--apply]        Rust target/ dirs (a Cargo.toml beside them), plus any
-                             installed binary symlinked into one ("relink" lines)
+                             installed binary symlinked into one ("relink" lines);
+                             --apply first swaps each such link for a copy
   deps      [--days N] [--apply]
                              node_modules / venv / .venv in projects with no
                              source edit in N days (default 30)
@@ -75,7 +76,7 @@ list_targets() {
 
 bin_dirs=${CODE_GC_BIN_DIRS:-"$HOME/.claude/bin $HOME/.local/bin $HOME/bin $HOME/.cargo/bin /usr/local/bin /opt/homebrew/bin"}
 
-# Installed binaries that point into one of the target dirs on stdin — deleting it breaks them.
+# Installed binaries that point into one of the target dirs on stdin, as "link<TAB>dest".
 linked_into() {
   local targets link dest t
   targets=$(cat)
@@ -84,8 +85,22 @@ linked_into() {
   done | while IFS= read -r link; do
     dest=$(readlink "$link")
     while IFS= read -r t; do
-      case "$dest" in "$t"/*) printf 'relink\t%s -> %s\n' "$link" "$dest" ;; esac
+      case "$dest" in "$t"/*) printf '%s\t%s\n' "$link" "$dest" ;; esac
     done <<<"$targets"
+  done
+}
+
+# Swap each link for a copy of its binary, so the tool keeps running (hooks, status line)
+# while its target is gone. The repo's next install puts the link back.
+detach() {
+  local link dest
+  while IFS=$'\t' read -r link dest; do
+    if [ -f "$dest" ] && cp -p "$dest" "$link.code-gc" && mv -f "$link.code-gc" "$link"; then
+      printf 'copied\t%s (was -> %s; reinstall to relink)\n' "$link" "$dest"
+    else
+      rm -f "$link.code-gc"
+      printf 'relink\t%s -> %s (could not copy; rebuild it)\n' "$link" "$dest"
+    fi
   done
 }
 
@@ -114,10 +129,16 @@ main_branch() {
 }
 
 cmd_targets() {
-  local targets
+  local targets links=
   targets=$(list_targets)
-  [ -n "$targets" ] && echo "$targets" | linked_into
-  if [ $apply -eq 1 ]; then echo "$targets" | remove; echo "removed"; else echo "$targets" | sized; fi
+  [ -n "$targets" ] && links=$(echo "$targets" | linked_into)
+  if [ $apply -eq 1 ]; then
+    [ -n "$links" ] && echo "$links" | detach
+    echo "$targets" | remove; echo "removed"
+  else
+    [ -n "$links" ] && echo "$links" | awk -F'\t' '{ printf "relink\t%s -> %s\n", $1, $2 }'
+    echo "$targets" | sized
+  fi
 }
 
 cmd_deps() {

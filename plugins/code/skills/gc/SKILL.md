@@ -48,10 +48,12 @@ Present the list with sizes, get a single yes, then apply.
 
 - `targets` only matches a `target/` with a `Cargo.toml` beside it, so a Maven
   or unrelated `target/` is never touched. The cost of deleting is one rebuild.
-- **Rebuild every `relink` line after applying.** A tool installed as a symlink
-  into `target/release/` (a `make install` that runs `ln -s`) breaks the moment
-  its target goes — including a status line binary, which fails silently.
-  Rerun that repo's install, or `cargo build --release` for a bare link.
+- **`relink` lines are tools installed as a symlink into `target/release/`**
+  (a `make install` that runs `ln -s`). Deleting the target would break them
+  mid-session, hooks and status line included, so `--apply` first swaps each
+  link for a copy of its binary (`copied` lines). Afterwards rerun that repo's
+  install to get the link back. A `relink … could not copy` line is a tool that
+  is now broken: rebuild it right away.
 - `deps` treats a project as live if *any* source file changed within
   `--days`, so a project in active use keeps its `node_modules`.
 - `*.ShipIt` dirs hold downloaded app updates that were already applied.
