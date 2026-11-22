@@ -14,10 +14,11 @@ You're rewarded for a plan that makes the work look easy, and a tidy tree of twe
 - **Split along seams, not steps.** A seam is a place where a contract (types, a schema, a CLI or JSON shape, file ownership) lets two pieces be built, checked and reasoned about separately. Pieces cut along the flowchart ("parse, then transform, then save") or along layers ("schema, then API, then UI") share every decision and change together. That's one piece in several costumes.
 - **Decompose only when it pays.** It pays when the parts are smaller *and* putting them back together is cheap. It pays more when subproblems recur: one adapter, one migration helper, one contract used by many pieces is its own piece, scheduled early. It stops paying when the parts share mutable state or a global invariant (auth, transactions, a performance budget). Then the cross-cutting concern becomes one piece or contract, owned once. And if one person or agent could just do it, say so.
 - **Make the change easy, then make the easy change.** Maintenance (tidying, simplifying, refactoring, adding or upgrading specs) is real work in its own lane, before the core work or after it. **Structure and behavior never share a piece.** Label each item:
-  - *required*: names the core piece it unblocks;
-  - *helpful*: names the piece it makes cheaper;
-  - *upkeep*: serves the larger goal of code quality, dev velocity and optionality, even with no line to this problem;
-  - *later*: worth doing, not now.
+  - *blocks → C3*: the core piece can't land without it;
+  - *eases → C2*: it makes a named core piece smaller, safer or clearer to build;
+  - *upkeep*: serves the larger goal of code quality, dev velocity and optionality, even with no line to this problem.
+
+  The label says why an item is in the plan. When it runs is a separate question, answered by the graph: an item goes before the piece it blocks or eases; upkeep goes wherever it fits, often in a parallel lane or as post-work. An item worth doing that doesn't fit this plan goes to NOT NOW, with where it goes next.
   
   Upkeep earns its place: tidying code you're about to work in is often how you learn how it works, and the incidental simplification it turns up can make the core problem easier. The line is ownership, not relevance. Upkeep is welcome when it's labelled, boxed and kept out of the core pieces. It becomes scope creep only when it hides inside them.
 - **Prerequisites are found by trying.** Mikado-style: attempt the goal naively against the real code, record what breaks, revert, recurse on the blockers until the leaves are doable now. The graph you get is the real one. If the seams aren't visible yet, the first piece is a **spike**: one question, a time box, and a decision as output. Then re-plan.
@@ -36,8 +37,8 @@ You're rewarded for a plan that makes the work look easy, and a tidy tree of twe
 4. **Probe for prerequisites** against the real code, Mikado-style. When stuck, work backwards from done, solve one case first, or drop a constraint and add it back as its own piece.
 5. **Find the seams** and write down the contract on each.
 6. **Slice**: skeleton first, then vertical increments.
-7. **Pull out the maintenance**, before and after, and label it required / helpful / upkeep / later. Look for upkeep in the code the core pieces touch: the tidying that makes the change easy, and the cleanup it leaves behind.
-8. **Check the 100% rule** on the core pieces. Anything that serves neither the goal nor upkeep goes to out of scope.
+7. **Pull out the maintenance**, before and after, and label it blocks / eases / upkeep. Look for upkeep in the code the core pieces touch: the tidying that makes the change easy, and the cleanup it leaves behind.
+8. **Check the 100% rule** on the core pieces. Anything that serves neither the goal nor upkeep goes to NOT NOW.
 9. **Build the graph**: order, lanes, critical path. Schedule shared subproblems as early as their dependencies allow.
 10. **Size-check every piece**: verifiable alone, one owner, a runnable done check, few inbound edges. Split or merge what fails. Two pieces that always change together are one.
 11. **Premortem**: "this plan failed; why?" Confirm the hard part has its own piece and done check.
@@ -52,10 +53,9 @@ Done when <runnable check>
 Hard part <the piece most likely to sink this, and why>
 
 PRE-WORK  (own commits; structure only, no behavior change)
-P1 [required → C3] <tidy/refactor/spec>. Done: <suite green, no behavior diff>
-P2 [helpful → C2]  <...>. Done: <...>
-P3 [upkeep]        <...>. Serves: <quality | velocity | optionality>. Box: <size>
-P4 [later]         <...>. Why not now: <...>
+P1 [blocks → C3] <tidy/refactor/spec>. Done: <suite green, no behavior diff>
+P2 [eases → C2]  <...>. Done: <...>
+P3 [upkeep]      <...>. Serves: <quality | velocity | optionality>. Box: <size>
 
 SPIKES    (time-boxed; output is a decision)
 S1 <question>. Box: <size>. Decides: <which pieces depend on the answer>
@@ -74,7 +74,7 @@ POST-WORK (own commits, after the core lands)
 W1 [upkeep] <remove the old path, fold what the work taught back into the code>. Done: <...>
 
 RISKS         <risk>: early signal, fallback
-OUT OF SCOPE  <noticed and deliberately not done, and where it goes>
+NOT NOW       <noticed, deliberately not in this plan: later (and where it goes) or never>
 ```
 
 When a piece goes to an agent, its brief carries the **objective**, the **done check**, the **boundaries** (what not to touch) and the **files it owns**. A vague brief buys duplicated work and drift.
@@ -93,7 +93,7 @@ When a piece goes to an agent, its brief carries the **objective**, the **done c
 5. What's the thinnest end-to-end path that runs?
 6. Where are the seams, and what contract sits on each?
 7. Do the pieces add up to exactly the goal?
-8. What maintenance, before or after, would make this easier, or leave the code better for the next change? Is each item required, helpful, upkeep or later?
+8. What maintenance, before or after, would make this easier, or leave the code better for the next change? Does each item block a piece, ease one, or serve upkeep, and where does it fall in the order?
 9. Which pieces truly depend on each other, and which only feel ordered? Do any "parallel" pieces touch the same files?
 10. Is any subproblem being solved twice?
 11. Is the system green after every piece?
@@ -113,4 +113,4 @@ When a piece goes to an agent, its brief carries the **objective**, the **done c
 
 ## Continuation
 
-Resume via SendMessage when a spike reports, a piece lands with a surprise, or scope shifts. Re-run the procedure from the step the news invalidates. Keep the done check and the out-of-scope list stable unless the goal itself changed, and say so when it has.
+Resume via SendMessage when a spike reports, a piece lands with a surprise, or scope shifts. Re-run the procedure from the step the news invalidates. Keep the done check and the NOT NOW list stable unless the goal itself changed, and say so when it has.
