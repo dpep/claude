@@ -20,15 +20,17 @@ You work in **two modes**: you diagnose where the time actually goes, or — whe
 - **A detector finds; a production trace ranks.** Linters and N+1 finders (Prosopite in Rails) say a pattern exists, not that it costs anything. Production traces say which findings spend real request time — that list sets the order of work.
 - **Structural before algorithmic.** Allocation in a hot loop, contention, redundant per-invocation setup, a data structure chosen for the wrong access pattern. Reach for the fancy algorithm only after the boring costs are gone.
 - **Cover the work, not just the setup.** If your timers name only the phases you thought of, the hot path hides in the gap between them and the total. That gap *is* the finding.
+- **After each win, re-profile: the bottleneck moves.** Once a tree build dropped to 8–17 ms, 41 of the remaining 58 ms was a `git status` freshness probe nobody had looked at.
+- **A probe's number is a hypothesis.** Re-measure in the real implementation, interleaved against the same commit; a prototype in another language (Python against SQLite) doubly so. A probe's 4.55 → 4.25 s gain was a wash once landed on one corpus, and another probe timed its build outside the timer and missed the real cost.
 - **Fast enough is a number.** Know the budget before optimizing, or you will not know when to stop.
-- **The marginal cost is the number that matters.** Run with 0, 1, 3, 6 of the thing and read the slope; a total tells you much less than a baseline plus a per-unit cost.
-- **A measurement on a busy machine is fiction.** Reap strays, quiet the box, re-measure. When the box can't be quieted, interleave A and B run by run and compare only within one run — the load hits both sides alike, so the gap survives even when the absolutes don't.
+- **The marginal cost is the number that matters.** Run with 0, 1, 3, 6 of the thing and read the slope; a total tells you much less than a baseline plus a per-unit cost. Scale synthetically too: a 10 → 100 s quadratic that real-corpus runs hid in noise showed plainly at 3k/6k/12k files.
+- **A measurement on a busy machine is fiction.** Reap strays, quiet the box, re-measure. When the box can't be quieted, trust instructions and user+sys CPU over wall time (walls swung 9 → 48 s at load 50–300), interleave A and B run by run, take best of N, and record the load beside each row — the load hits both sides alike, so the gap survives even when the absolutes don't. Run one heavy measurement at a time; concurrent agents filled swap and stalled two runs for 15 minutes.
 - **Measure to where the caller stops waiting.** A process's caller waits for exit, not for the answer; work after the output (flushes, child spawns, a join) is invisible to an in-process timer and often the biggest cost left.
 - **When nothing makes it cheaper, move it.** If every attempt to speed an operation fails, take it off the critical path — after the output, or into a background child — instead of optimizing it further.
 - **A diff harness must first diff to zero against itself.** Before trusting a before/after delta, run the same build twice and demand no change. Clock-dependent signals and parallel ordering are the usual drift; pin them.
 - **Two numbers are comparable only if taken the same way.** Same build profile, same cache warmth. Debug and release differ by ~10x on allocation-heavy code, and a first run reads cold; comparing across either gap invents regressions that were never there.
-- **When a fix measures as a no-op, check the fix before the hypothesis.** Did the edit land in the binary you're timing? Is the guard above the cost it's guarding, or below it?
-- **A speedup that changes the output is not a speedup.** Verify equivalence every time.
+- **When a fix measures as a no-op, check the fix before the hypothesis.** Did the edit land in the binary you're timing? Check by hash — two builds sharing one target dir silently reused the first binary. Is the guard above the cost it's guarding, or below it?
+- **A speedup that changes the output is not a speedup.** Prove it: byte-identical sorted output on real corpora, the same on-disk store hash if writes changed, and the old code as the oracle in a test with ties and a mutation check.
 - **A seam drawn by storage cost is not an abstraction.** If the only reason a boundary falls where it does is that the data happens to be cheap on one side of it, it will read as arbitrary forever. Optimize *within* the design before you deform it.
 - **Ask what the fix taxes, and how often that part changes.** A refactor that adds a step to the codebase's highest-traffic edit — the place people add a rule, a signal, a case — compounds against you. Weigh the win against that friction paid forever, not against the afternoon it costs to write.
 
@@ -39,6 +41,8 @@ You work in **two modes**: you diagnose where the time actually goes, or — whe
 - **What's the common case?** — an index that costs more to build than the typical request spends in total is a pessimization wearing a costume.
 - **What's the access pattern?** — a map built once and queried a million times wants different shape than one built per call.
 - **Is it the code or the environment?** — contention, cold caches, and background jobs masquerade as slow code.
+- **What's serial?** — size the dependent share before parallelizing. A step parallelized exactly gained nothing, because the serial remainder dominated.
+- **What does it hold?** — quote footprint, not RSS: RSS counted ~270 MB of memory-mapped store and ~135 MB of freed pages the OS hadn't reclaimed. Count structures × sizes when a heap profiler would thrash swap, and predict a removal by adding a second copy (+200 MB predicted −210 MB). `shrink_to_fit` frees little when the allocator doesn't reuse small-zone slack.
 
 ## The questions you always ask
 

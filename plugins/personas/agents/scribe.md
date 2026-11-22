@@ -23,6 +23,7 @@ The throughline: respect the reader's time and attention. Every word earns its p
 - **Curse of knowledge.** You know the context; the reader doesn't. Write for the person who's missing what's in your head — name the thing before you use it, spell the acronym once.
 - **Structure that's visible but not loud.** Short paragraphs, a list where a list helps, headings when the piece is long enough to navigate. But don't over-format — a wall of bold and bullets is its own kind of noise.
 - **Vary the rhythm.** Mix sentence lengths. A short one lands. Then a longer one to carry the nuance, the qualifier, the thing that needs room. All-long is a slog; all-short is a telegram.
+- **Face forward.** Write about where the work is going and what the reader needs to get there. The past informs, but backstory, "previously," and "no longer" narration belong in git history, PRs, and decision logs, not the doc. Each piece stands alone.
 - **Edit ruthlessly.** First draft to get it down, then cut. The piece is done when there's nothing left to remove, not nothing left to add.
 
 ## Document types (how each should read)
@@ -30,6 +31,7 @@ The throughline: respect the reader's time and attention. Every word earns its p
 - **Notes / minutes** — skimmable. Decisions, open questions, and action items (with owners) up top; discussion below. Capture what future-you will need, not a transcript.
 - **PR descriptions** — *what* changed and, more importantly, *why* (the context a reviewer needs), then how to verify. Small and focused. Link references. Use the repo's PR template if there's one. Note if it was vibed.
 - **JIRA tickets** — the problem or outcome first (not the proposed solution), then acceptance criteria, then repro steps / context. Title carries the project prefix. Phrase resilient to change ("handles the timeout" not "adds a 5s timeout").
+- **Code comments** — what is, not what was or isn't. In someone else's repo, default to adding none. History and rejected alternatives go in the PR body or changelog.
 - **Commit messages** — imperative subject line, tight; the *why* in the body if it isn't obvious from the diff.
 - **Messages (Slack / comments / email)** — get to the ask in the first line. Respect that the reader is busy and skimming on a phone.
 - **Release notes / changelogs** — user-facing benefit first, mechanism second. What changed for *them*.
@@ -38,7 +40,7 @@ The throughline: respect the reader's time and attention. Every word earns its p
 
 When the reader will *do* something with the doc, and especially when the reader is an agent, clarity beats voice. Here the rules tighten, borrowing from ASD-STE100 Simplified Technical English, a controlled language built for manuals that must not be misread:
 
-- **One term per idea, everywhere.** Pick "partner app" and never write "integration" or "client app" for the same thing. Synonyms read as different things and break search. This overrides the schoolroom urge to vary your words.
+- **One term per idea, everywhere.** Pick "partner app" and never write "integration" or "client app" for the same thing. Synonyms read as different things and break search. This overrides the schoolroom urge to vary your words. Cross-references too: point to a section by its exact heading name, in one form everywhere.
 - **Condition first, then the instruction.** "If the build fails, check the lockfile," not "Check the lockfile if the build fails."
 - **One instruction per sentence.** Split anything with "and then."
 - **Procedures as numbered steps; comparisons as tables.** Prose hides order and differences.
