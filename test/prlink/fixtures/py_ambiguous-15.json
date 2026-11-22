@@ -1,0 +1,18 @@
+{
+  "baseRefName": "main",
+  "baseRefOid": "7978fb8ad68d87787ac99dc9e85c95f76efb67e8",
+  "body": "Fixes three regressions from #11, none of them released yet. First of three fix PRs from the bug hunt.\n\n### Bugs\n```python\nclass Base(abc.ABC):\n    @abc.abstractmethod\n    def kind(self): ...\n\n    @ambiguous\n    def name(self): ...\n# TypeError: Base.name() missing 1 required positional argument: 'self'\n```\nThe same failure hits `@dataclass`, `help()` / pydoc, and `@dataclass` on an `@ambiguous` class. Two related problems:\n- `inspect.signature(any_ambiguous_fn)` raises `ValueError: no signature found for builtin`.\n- `now = ambiguous(time.time)` or `stolen = Foo().name` in a class body gets `self` bound in. Plain Python doesn't do that.\n\n### Cause\n#11 put `__get__` on the delegating proxy and left the proxy itself in the class namespace. Anything that reads the namespace gets the proxy:\n- `ABCMeta` scans every value for `__isabstractmethod__`;\n- `dataclasses` checks for fields;\n- pydoc lists members.\n\nEach of those lookups is forwarded to the result, which means calling the method, with no `self`. And because the type now had `__get__`, `inspect` classified every ambiguous function as a method descriptor and took its builtin path.\n\n### Fix\n[`__set_name__`](https://github.com/dpep/py_ambiguous/blob/ad4c120/ambiguous/ambiguous.py#L15) replaces `__get__`. Python calls it for every value in a class body while building the class, before `ABCMeta` or `@dataclass` look at the namespace. It swaps the proxy for a plain [`_AmbiguousMethod`](https://github.com/dpep/py_ambiguous/blob/ad4c120/ambiguous/ambiguous.py#L51) descriptor, which doesn't forward anything. That's the descriptor #11 removed; `ambiguous_class` uses it again too. The swap only happens for [plain, unbound functions](https://github.com/dpep/py_ambiguous/blob/ad4c120/ambiguous/ambiguous.py#L22), so builtins and already-bound methods stay unbound, as in plain Python.\n\n**Limitations:**\n- **Enum:** methods still can't use `@ambiguous` individually, because Enum inspects each value as it's assigned, before `__set_name__` runs. Decorating the Enum class with `@ambiguous` works. The changelog says so.\n- **Late assignment:** `Cls.x = ambiguous(f)` after the class exists doesn't bind `self`, since `__set_name__` only runs during class creation.\n\nTests: [`test_class_introspection`](https://github.com/dpep/py_ambiguous/blob/ad4c120/tests/test_ambiguous_object.py#L128), [`test_class_attribute_no_rebinding`](https://github.com/dpep/py_ambiguous/blob/ad4c120/tests/test_ambiguous_object.py#L114) and [`test_signature`](https://github.com/dpep/py_ambiguous/blob/ad4c120/tests/test_ambiguous_object.py#L164) fail before the fix. Passes on 3.12 and 3.14, and under `-O`.\n",
+  "headRefName": "fix-method-introspection",
+  "headRefOid": "6f799555cb981328630739a5571075ac2f66b67c",
+  "headRepository": {
+    "id": "MDEwOlJlcG9zaXRvcnkxMjI1NDgyODM=",
+    "name": "py_ambiguous",
+    "nameWithOwner": "dpep/py_ambiguous"
+  },
+  "headRepositoryOwner": {
+    "id": "MDQ6VXNlcjkxODgwNA==",
+    "name": "Daniel Pepper",
+    "login": "dpep"
+  },
+  "state": "MERGED"
+}

@@ -1,6 +1,6 @@
 ---
 name: git
-description: Git operations, branching, commits, and rebasing. Activate when starting new git work, committing, rebasing a branch onto main, or resolving merge conflicts. Pull requests are the github skill, not this one.
+description: Git operations, branching, commits, and rebasing. Activate when starting new git work, committing, rebasing a branch onto main, or resolving merge conflicts. Pull requests are the pull-requests skill, not this one.
 allowed-tools: Bash(git *), Bash(gh *), Bash(open *), ToolSearch, mcp__github__*
 ---
 
@@ -15,7 +15,7 @@ Use when:
 - Committing, rebasing a branch onto main
 - Resolving merge conflicts
 
-Opening, describing, or updating a **pull request** is the `github` skill — this
+Opening, describing, or updating a **pull request** is the `pull-requests` skill — this
 one stops at the push.
 
 ## Subskills
@@ -61,7 +61,7 @@ git reset --hard origin/main
 1. Fetch latest: `git fetch origin main`
 2. Create branch: `git checkout -b dpep/topic origin/main`
 3. Make changes, commit, push
-4. Open the PR — see the `github` skill
+4. Open the PR — see the `pull-requests` skill
 
 ## Rebasing a Branch
 
@@ -74,7 +74,7 @@ git push --force-with-lease origin <branch-name>
 ```
 
 For a branch that already has an **open PR**, a local rebase isn't always the right
-move — it invalidates approvals. See the `github` skill.
+move — it invalidates approvals. See the `pull-requests` skill.
 
 ## Commit Granularity
 

@@ -1,0 +1,18 @@
+{
+  "baseRefName": "main",
+  "baseRefOid": "78b0fa1b9c9658fe3e948ed5d4b3a5647e2ad58c",
+  "body": "Fixes the bugs from a bug hunt and a Python-idioms review that don't change any intended behavior. There's one commit per fix, and each comes with tests that fail without it.\n\n- **Mappings and sets.** [`pluck`](https://github.com/dpep/py_pluckit/blob/305cf61/pluckit/pluck.py#L18) now dispatches on `collections.abc.Mapping` and `Set` instead of `dict` and `set`. Before, `pluck(MappingProxyType({'a': [1]}), 0)` silently returned `['a']` and `ChainMap` crashed. The [wildcard](https://github.com/dpep/py_pluckit/blob/305cf61/pluckit/pluckit.py#L86) only calls `.values()` on Mappings, so an iterable whose `values` attribute isn't a method no longer breaks.\n- **Method-wrappers.** [`inspect.isroutine`](https://github.com/dpep/py_pluckit/blob/305cf61/pluckit/pluckit.py#L120) replaces the hand-written list of function types. `pluckit('abc', '.__len__')` used to return the method object; it now returns 3. Classes stored as attributes still aren't called.\n- **Parse, then evaluate.** [`parse_path`](https://github.com/dpep/py_pluckit/blob/305cf61/pluckit/pluckit.py#L48) turns the whole path into steps, and [`_walk`](https://github.com/dpep/py_pluckit/blob/305cf61/pluckit/pluckit.py#L83) applies them. Before, the regex ran inside the evaluation loop. This fixes:\n  - `assert obj == res` called the object's `__eq__`, so `pluckit(float('nan'), 'real')` and numpy-like objects crashed, except under `python -O`. The bare-name heuristic now applies only to the first step because of how the path is parsed, so no assert is needed.\n  - validation depended on the data: `pluck([], '!!bad')` returned `[]` and `pluckit([], '*.a.')` passed. [`pluck` validates up front](https://github.com/dpep/py_pluckit/blob/305cf61/pluckit/pluck.py#L16) now. An empty path is an error.\n  - quoted keys can contain `]`, `.` or `[`: `'[\"a].b\"]'` used to look up `\"a`. `'[\"]'` used to look up the empty string.\n  - whitespace inside brackets is ignored: `'[ 0 ]'` now works.\n\n  The redundant `int` branch and `from types import *` are gone, and `__pluckPath` is now `_walk`. The double underscore never made it private, because Python only does that inside a class.\n- **`native.uninstall`** [skips types it didn't install](https://github.com/dpep/py_pluckit/blob/305cf61/pluckit/native.py#L36). Before, it raised `KeyError: 'pluck'` from forbiddenfruit.\n- **Exports.** `__all__` now lists the Pluckable classes, so `from pluckit import *` includes them.\n\nNot in this PR, because each one changes current behavior and needs a decision:\n- Should attributes that hold functions be called? Today `SimpleNamespace(cb=len)` with `'cb'` crashes calling `len()`.\n- Should `'a.b'` fall back to a key lookup on dicts?\n- A bare name that matches a method calls it, so `pluckit(lst, 'pop')` mutates the list.\n- Should `pluck` on a `str` raise instead of plucking each character?\n- Should a `None` handle raise instead of returning `None` for every item?\n- Should `native.py` keep patching builtins on import, or go away entirely?\n",
+  "headRefName": "fix-bugs",
+  "headRefOid": "305cf61ed9db5f8b59bcfbaa4afae21df5da0528",
+  "headRepository": {
+    "id": "MDEwOlJlcG9zaXRvcnkxMzA5NjUwMDc=",
+    "name": "py_pluckit",
+    "nameWithOwner": "dpep/py_pluckit"
+  },
+  "headRepositoryOwner": {
+    "id": "MDQ6VXNlcjkxODgwNA==",
+    "name": "Daniel Pepper",
+    "login": "dpep"
+  },
+  "state": "CLOSED"
+}

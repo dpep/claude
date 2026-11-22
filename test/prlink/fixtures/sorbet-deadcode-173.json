@@ -1,0 +1,18 @@
+{
+  "baseRefName": "main",
+  "baseRefOid": "a417b2db34230ac5f8473ef2e012ee3fabab4ab9",
+  "body": "## What's wrong\n\n`--history` and `--dead-since` match a candidate's name as a substring.\n\n- `added:` ([`History#introductions`](https://github.com/corsonknowles/sorbet-deadcode/blob/a417b2d/lib/sorbet_deadcode/git/history.rb#L112)) takes the first added line that `include?`s the name, so `name` is reported as introduced by `def display_name`, and `ready` by `def ready?`.\n- `dead_since:` ([`History#pickaxe_commit_lines`](https://github.com/corsonknowles/sorbet-deadcode/blob/a417b2d/lib/sorbet_deadcode/git/history.rb#L98)) runs `git log -S name`, which counts substrings. A commit that adds a call to `lonely_method_helper` turns `lonely_method` from \"dead-on-arrival\" into \"dead since <that commit>\".\n\n## The fix\n\nMatch the name as a whole Ruby identifier: no word character before it, and no word character or `?`/`!`/`=` after it, since `foo?`, `foo!` and `foo=` are different methods.\n\n- `dead_since:` uses `git log -S <pattern> --pickaxe-regex` ([`pickaxe_pattern`](https://github.com/dpep/sorbet-deadcode/blob/e0474ec/lib/sorbet_deadcode/git/history.rb#L111)). That keeps `-S`'s \"reference count changed\" meaning; `-G` would also match a commit that only moves or reformats a caller. git's regex is POSIX ERE, with no lookaround or portable `\\b`, so the boundaries are bracket expressions.\n- `added:` uses the Ruby equivalent ([`identifier_pattern`](https://github.com/dpep/sorbet-deadcode/blob/e0474ec/lib/sorbet_deadcode/git/history.rb#L116)), and scrubs each line first, since `match?` raises on invalid UTF-8 where `include?` didn't.\n\nOne tradeoff: the ERE pattern consumes the character after the name, so adjacent occurrences like `foo(foo)` count once. That seemed worth a portable pattern.\n\n## Tests\n\nNew cases in [`history_spec.rb`](https://github.com/dpep/sorbet-deadcode/blob/e0474ec/spec/sorbet_deadcode/git/history_spec.rb) for longer identifiers and `?` suffixes (fail on main), literal matching of `ready?`, and invalid UTF-8. `bundle exec rake` passes: 100% line and branch coverage, RuboCop clean.\n",
+  "headRefName": "fix-history-identifier-boundaries",
+  "headRefOid": "e0474ec41dda3526167f9c7dea3b90f66498f0d7",
+  "headRepository": {
+    "id": "R_kgDOV2UdTw",
+    "name": "sorbet-deadcode",
+    "nameWithOwner": "dpep/sorbet-deadcode"
+  },
+  "headRepositoryOwner": {
+    "id": "MDQ6VXNlcjkxODgwNA==",
+    "name": "Daniel Pepper",
+    "login": "dpep"
+  },
+  "state": "OPEN"
+}

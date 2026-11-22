@@ -1,0 +1,18 @@
+{
+  "baseRefName": "main",
+  "baseRefOid": "2adf5e36363ce15efb8dd556a5b5941765249589",
+  "body": "Fixes a bug introduced in [#19](https://github.com/dpep/pytest-autofixture/pull/19), which hasn't been released. A test's `parametrize` names leaked into every fixture body it set up, including conftest and third-party fixtures. For example, `parametrize(\"date\", ...)` made a fixture's `date.today()` fail. A module-scoped fixture could hit `ScopeMismatch`, depending on which test set it up first.\n\nThe README's own reasoning, that a parametrized name belongs to the test like an argument, means fixture bodies shouldn't see it first, because a test's arguments aren't visible inside fixtures. [`pytest_runtest_call`](https://github.com/dpep/pytest-autofixture/blob/fb9dbbf/pytest_autofixture/__init__.py#L283) now passes the test's parametrized names to [`_LiveGlobals`](https://github.com/dpep/pytest-autofixture/blob/fb9dbbf/pytest_autofixture/__init__.py#L163-L174) for the test body only. Fixture swaps get none. A fixture that reads a parametrized name still gets it whenever no global or builtin has that name, as before #19.\n\n[`test_parametrize_shadows_builtins`](https://github.com/dpep/pytest-autofixture/blob/fb9dbbf/tests/test_autofixture.py#L140-L150) now checks both sides: the test sees its `format` parameter, and a fixture calling `format(...)` gets the builtin.\n",
+  "headRefName": "params-test-only",
+  "headRefOid": "fb9dbbf950da98c4870d5ca925cd10ebc2bf8e1b",
+  "headRepository": {
+    "id": "R_kgDOMZ4-pQ",
+    "name": "pytest-autofixture",
+    "nameWithOwner": "dpep/pytest-autofixture"
+  },
+  "headRepositoryOwner": {
+    "id": "MDQ6VXNlcjkxODgwNA==",
+    "name": "Daniel Pepper",
+    "login": "dpep"
+  },
+  "state": "MERGED"
+}

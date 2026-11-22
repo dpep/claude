@@ -1,6 +1,6 @@
 # code
 
-Programming workflow & code-navigation skills. No hooks; the `rq` and `gqls` skills drive companion CLIs, and `find-gem` ships as a script.
+Programming workflow & code-navigation skills. The `rq` and `gqls` skills drive companion CLIs; `find-gem`, `code-gc` and `prlink` ship as scripts.
 
 ## Install
 
@@ -12,6 +12,12 @@ Programming workflow & code-navigation skills. No hooks; the `rq` and `gqls` ski
 ## Skills
 
 - **git** — branching, commits, rebasing, repo optimization. Subskill: `optimize` (pack consolidation, worktree + branch cleanup, fetch refspec narrowing). Reference: `worktrees` (multi-agent coordination, load on demand).
+- **pull-requests** — open PRs as drafts, write titles and descriptions, link
+  every code reference to a pinned permalink, update with upstream without
+  dismissing approvals, and reply to review comments. Drives `prlink`, a Ruby
+  (stdlib-only) script in `bin/` that finds the code references in a PR body
+  and links each one, resolving names with `trekr` (Ruby) or `rq` (other
+  languages) when they are installed. Its suite: `make test-prlink`.
 - **rq** — find where a symbol is defined via the `rq` CLI; ranks the most-likely
   definition first (prefer over grep/rg for "where is X defined"). Includes
   binary install/update guidance (`brew install dpep/tools/rq`).
@@ -43,7 +49,7 @@ See the repo-level [CLAUDE.md](../../CLAUDE.md).
 
 ## Tools these skills drive
 
-Four skills call a CLI. A missing one doesn't fail loudly — Claude reads the
+Several skills call a CLI. A missing one doesn't fail loudly — Claude reads the
 skill, the command isn't found, and it falls back to grep — so a SessionStart
 hook reports which are absent and how to get each:
 
@@ -54,6 +60,7 @@ hook reports which are absent and how to get each:
 | `find-skill` | `make -C ~/.claude/plugins/marketplaces/dpep install` |
 | `find-gem` | ships in `bin/` here — the same `make install` symlinks it |
 | `code-gc` | ships in `bin/` here — the same `make install` symlinks it |
+| `prlink` | ships in `bin/` here — the same `make install` symlinks it; resolves names with `trekr` (`brew install dpep/tools/trekr`) and `rq` when present |
 
 The hook is quiet when everything resolves, and speaks up out loud only when
 *nothing* does — a fresh install you probably meant to finish. If some tools

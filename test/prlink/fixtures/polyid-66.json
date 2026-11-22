@@ -1,0 +1,18 @@
+{
+  "baseRefName": "main",
+  "baseRefOid": "2bc1e97e92527f7810f145426816f7e140c50812",
+  "body": "Fixes from a second bug hunt, aimed at code changed since 0.2.0. Every fix has a spec that fails before it.\n\n- **Critical: an unresolved uuid matched an unrelated row.** An unknown scalar uuid [translated](https://github.com/dpep/polyid/blob/99b65d9/lib/polyid/model.rb#L177) to nil, which [read as \"no translation\"](https://github.com/dpep/polyid/blob/99b65d9/lib/polyid/model.rb#L205). The raw string then reached ActiveRecord and was integer-cast: `\"0190abcd-...\"` became 190. So `where(id:)`, `find_by`, `exists?` and `delete` could hit row 190. An unknown uuid inside an array became NULL and matched rows with no foreign key. Both now match nothing.\n- **A `belongs_to ..., primary_key: :uuid` foreign key was translated to an integer id.** That column already holds uuids, so it's now [left alone](https://github.com/dpep/polyid/blob/99b65d9/lib/polyid/model.rb#L230). Association classes are also only resolved when a value looks like a uuid. Before, `where(thing_id: 3)` raised if the association's `class_name` was missing.\n- **Permitted params skipped translation.** `where` and `find_by` now [sanitize params first](https://github.com/dpep/polyid/blob/99b65d9/lib/polyid/relation.rb#L15), as ActiveRecord does.\n- **`find_or_create_by` linked records to the wrong row.** It found with the translated foreign key but created with the raw uuid. The [`find_or_create_by` family](https://github.com/dpep/polyid/blob/99b65d9/lib/polyid/relation.rb#L22) now translates its attributes.\n- **A destroy could leave a stale cache entry.** In `transaction { find(uuid).destroy! }`, the lookup's deferred cache write ran after the destroy's eviction, because a record's `after_commit` callbacks run before the transaction's own callbacks. The [eviction](https://github.com/dpep/polyid/blob/99b65d9/lib/polyid/model.rb#L310) is now queued on the transaction too, so the two run in order.\n- **`find(uuid)` missed on a loaded `has_many ..., inverse_of:` association.** Rails searches the loaded records by id there and never reaches `Relation#find`. It's now [translated](https://github.com/dpep/polyid/blob/99b65d9/lib/polyid/collection_association.rb).\n- **Small ones:**\n  - `find(uuid, [uuid])` now [flattens](https://github.com/dpep/polyid/blob/99b65d9/lib/polyid/model.rb#L152) its arguments before translating.\n  - `uuids_for` no longer [caches](https://github.com/dpep/polyid/blob/99b65d9/lib/polyid/model.rb#L98) rows with no uuid.\n\nNot fixed: when a uuid resolves to a row outside the relation's scope, the `RecordNotFound` message names the integer id rather than the uuid.\n",
+  "headRefName": "hunt2-fixes",
+  "headRefOid": "99b65d92f8742c5826018f783f169bc93164dbc1",
+  "headRepository": {
+    "id": "R_kgDOQD-jbw",
+    "name": "polyid",
+    "nameWithOwner": "dpep/polyid"
+  },
+  "headRepositoryOwner": {
+    "id": "MDQ6VXNlcjkxODgwNA==",
+    "name": "Daniel Pepper",
+    "login": "dpep"
+  },
+  "state": "CLOSED"
+}

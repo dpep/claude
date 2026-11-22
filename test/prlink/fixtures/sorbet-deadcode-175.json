@@ -1,0 +1,18 @@
+{
+  "baseRefName": "main",
+  "baseRefOid": "a417b2db34230ac5f8473ef2e012ee3fabab4ab9",
+  "body": "## What's wrong\n\n[`detect_column`](https://github.com/corsonknowles/sorbet-deadcode/blob/a417b2d/lib/sorbet_deadcode/lsp/dead_code_finder.rb#L149) ends its `def` pattern with `\\b`, which can't match after `?`, `!` or `=`. So `def ok?`, `def save!(x)` and `def name=(v)` fall back to column 0, and the LSP query asks about whatever sits there: Sorbet may return unrelated references (kept as live) or none (kept as dead). [`HybridFinder`](https://github.com/corsonknowles/sorbet-deadcode/blob/a417b2d/lib/sorbet_deadcode/lsp/hybrid_finder.rb#L149) has the same pattern.\n\n## The fix\n\nReplace the trailing `\\b` with `(?![\\w?!=])` in both finders. `foo` still doesn't match `foo_bar`, `foo?`, `foo!` or `foo=`, and `foo?` now matches itself.\n\n## Tests\n\nNew cases in `dead_code_finder_spec.rb` and `hybrid_finder_spec.rb` check the column for `?`, `!` and `=` methods; they fail on main. `bundle exec rake` passes: 100% line and branch coverage, RuboCop clean.\n",
+  "headRefName": "fix-lsp-detect-column",
+  "headRefOid": "00510d78459a9c28f21c379fab4ef6288e809cb8",
+  "headRepository": {
+    "id": "R_kgDOV2UdTw",
+    "name": "sorbet-deadcode",
+    "nameWithOwner": "dpep/sorbet-deadcode"
+  },
+  "headRepositoryOwner": {
+    "id": "MDQ6VXNlcjkxODgwNA==",
+    "name": "Daniel Pepper",
+    "login": "dpep"
+  },
+  "state": "OPEN"
+}

@@ -1,0 +1,18 @@
+{
+  "baseRefName": "main",
+  "baseRefOid": "c944a0ec2db01afd8aed37e5de3dfa2249b7d451",
+  "body": "[`Client#send`](https://github.com/Shopify/spoom/blob/c944a0e/lib/spoom/sorbet/lsp.rb#L35) reads exactly one message after a request and returns it as the response ([lsp.rb#L37](https://github.com/Shopify/spoom/blob/c944a0e/lib/spoom/sorbet/lsp.rb#L37)). But a server can send notifications at any time. On a `# typed: false` file, Sorbet answers `textDocument/references` with a `window/showMessage` notification (\"File is `# typed: false`, could not determine references\") and then the response. Spoom returns the notification, the real response stays in the pipe, and every later answer shifts by one. Against Sorbet 0.6.13680, after two `references` calls, [`hover`](https://github.com/Shopify/spoom/blob/c944a0e/lib/spoom/sorbet/lsp.rb#L87) and [`document_symbols`](https://github.com/Shopify/spoom/blob/c944a0e/lib/spoom/sorbet/lsp.rb#L210) came back empty, and `workspace/symbol` got the hover response and raised a [`TypeError`](https://docs.ruby-lang.org/en/4.0/TypeError.html).\n\nThis reads until the message whose `id` matches the request. `textDocument/publishDiagnostics` still raises [`Error::Diagnostics`](https://github.com/Shopify/spoom/blob/c944a0e/lib/spoom/sorbet/lsp/errors.rb#L10) from [`read`](https://github.com/Shopify/spoom/blob/c944a0e/lib/spoom/sorbet/lsp.rb#L52), as before.\n\nTests: [`client_notifications_test.rb`](https://github.com/dpep/spoom/blob/92b178f/test/spoom/sorbet/lsp/client_notifications_test.rb#L30) sends two requests to a tiny Ruby server that sends a notification before each response. It fails on `main`. The test server also accepts Spoom's current framing, so this doesn't depend on #1052.\n",
+  "headRefName": "fix-lsp-response-id",
+  "headRefOid": "92b178fa402a27c87f5716ba63dc46a05d97e313",
+  "headRepository": {
+    "id": "R_kgDOV2086Q",
+    "name": "spoom",
+    "nameWithOwner": "dpep/spoom"
+  },
+  "headRepositoryOwner": {
+    "id": "MDQ6VXNlcjkxODgwNA==",
+    "name": "Daniel Pepper",
+    "login": "dpep"
+  },
+  "state": "OPEN"
+}

@@ -1,0 +1,18 @@
+{
+  "baseRefName": "main",
+  "baseRefOid": "c3b31acc5f6faa61c96ada564ab13469cf91fa7c",
+  "body": "The bundled manufacturer OUI files were corrupt:\n\n- Every line of [`texas_instruments.txt`](https://github.com/dpep/rspec-networking/blob/0e7e7cb/lib/rspec/networking/mac_address/texas_instruments.txt#L1) had a `mac_addresses.tsv:` grep prefix, so `from(\"texas instruments\")` never matched.\n- Several files had their leading zeros stripped by a spreadsheet. For example, Microsoft's `002248` was stored as [`2248`](https://github.com/dpep/rspec-networking/blob/0e7e7cb/lib/rspec/networking/mac_address/microsoft.txt#L19). The hardcoded [Xerox `000000` entry](https://github.com/dpep/rspec-networking/blob/0e7e7cb/lib/rspec/networking/mac_address_manufacturers.rb#L6) was papering over one case of this.\n- `apple.txt` and `zyxel.txt` each contained a currency string (`AED 645.00`, `BEF 107.00`).\n- The lists were stale; Apple, for example, had 1270 entries against 1593 in the registry now.\n\nThe new [`script/update_manufacturers`](https://github.com/dpep/rspec-networking/blob/264608b/script/update_manufacturers#L13) regenerates the files from the [IEEE OUI registry](https://standards-oui.ieee.org/), using only [MA-L assignments](https://github.com/dpep/rspec-networking/blob/264608b/script/update_manufacturers#L30). Its output includes every well-formed old entry except 3 old \"Texas Instruments\" rows that actually belong to Texas Memory Systems, Texas Microsystems and Texas Digital Systems.\n\n[`mac_address_manufacturers.rb`](https://github.com/dpep/rspec-networking/blob/264608b/lib/rspec/networking/mac_address_manufacturers.rb) now just loads the files. A new [spec](https://github.com/dpep/rspec-networking/blob/264608b/spec/mac_address_manufacturers_spec.rb) checks that every entry is 6 uppercase hex digits; it fails on the old data.\n",
+  "headRefName": "fix-oui-data",
+  "headRefOid": "264608b016aa0167890c289eae9a41e54a493b5e",
+  "headRepository": {
+    "id": "R_kgDOMqudUg",
+    "name": "rspec-networking",
+    "nameWithOwner": "dpep/rspec-networking"
+  },
+  "headRepositoryOwner": {
+    "id": "MDQ6VXNlcjkxODgwNA==",
+    "name": "Daniel Pepper",
+    "login": "dpep"
+  },
+  "state": "MERGED"
+}

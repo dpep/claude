@@ -1,0 +1,18 @@
+{
+  "baseRefName": "main",
+  "baseRefOid": "c944a0ec2db01afd8aed37e5de3dfa2249b7d451",
+  "body": "[`Client#send_raw`](https://github.com/Shopify/spoom/blob/c944a0e/lib/spoom/sorbet/lsp.rb#L30) frames each request as `Content-Length:N\\r\\n\\r\\n<body>\\n` ([lsp.rb#L31](https://github.com/Shopify/spoom/blob/c944a0e/lib/spoom/sorbet/lsp.rb#L31)). That has no space after the colon, counts N in characters, and [`puts`](https://docs.ruby-lang.org/en/4.0/IO.html#method-i-puts) adds a newline after the body. The [LSP spec](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#headerPart) requires `Content-Length: N\\r\\n\\r\\n<body>`, with N in bytes.\n\nSo a request with a non-ASCII character (say, a `workspace/symbol` query for `Café`) reports a length one byte short. The server cuts the body short, and the missing byte plus the stray newline end up at the front of the next message. A server that parses the header strictly rejects every request.\n\nThis writes the header with the space and [`bytesize`](https://docs.ruby-lang.org/en/4.0/String.html#method-i-bytesize), and uses [`IO#write`](https://docs.ruby-lang.org/en/4.0/IO.html#method-i-write) so nothing follows the body.\n\nTests: [`client_framing_test.rb`](https://github.com/dpep/spoom/blob/c28f521/test/spoom/sorbet/lsp/client_framing_test.rb#L25) sends a non-ASCII request twice to a tiny Ruby server that accepts only spec-exact framing. It fails on `main`.\n",
+  "headRefName": "fix-lsp-framing",
+  "headRefOid": "c28f52118b11a1df6c4845c95e5780f46cb9f83c",
+  "headRepository": {
+    "id": "R_kgDOV2086Q",
+    "name": "spoom",
+    "nameWithOwner": "dpep/spoom"
+  },
+  "headRepositoryOwner": {
+    "id": "MDQ6VXNlcjkxODgwNA==",
+    "name": "Daniel Pepper",
+    "login": "dpep"
+  },
+  "state": "OPEN"
+}

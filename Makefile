@@ -1,4 +1,4 @@
-.PHONY: build test fmt fmt-check lint check install uninstall clean
+.PHONY: build test test-prlink fmt fmt-check lint check install uninstall clean
 
 # Skills are markdown and need no build. Some of them drive a small CLI;
 # those live in rust/ and land on PATH via `make install`.
@@ -38,6 +38,10 @@ test:
 	bash script/code-gc-test.sh
 	claude plugin test plugins/quiet-mode
 
+# Not in `check`: its gold set clones public repos and expects a recent trekr.
+test-prlink:
+	bash script/prlink-test.sh
+
 fmt:
 	cd rust && cargo fmt --all
 
@@ -56,6 +60,7 @@ install: build
 	$(call install_bin,rust/target/release/statusbar,statusbar)
 	$(call install_bin,plugins/code/bin/find-gem,find-gem)
 	$(call install_bin,plugins/code/bin/code-gc,code-gc)
+	$(call install_bin,plugins/code/bin/prlink,prlink)
 	@command -v find-skill >/dev/null 2>&1 || { \
 	    echo ""; \
 	    echo "  ⚠️  $(CLAUDE_BIN_DIR) is not on PATH — add to your shell rc:"; \
@@ -63,8 +68,8 @@ install: build
 	}
 
 uninstall:
-	@rm -f $(CLAUDE_BIN_DIR)/find-skill $(CLAUDE_BIN_DIR)/find-gem $(CLAUDE_BIN_DIR)/code-gc $(CLAUDE_BIN_DIR)/statusbar
-	@echo "unlinked find-skill / find-gem / code-gc / statusbar"
+	@rm -f $(CLAUDE_BIN_DIR)/find-skill $(CLAUDE_BIN_DIR)/find-gem $(CLAUDE_BIN_DIR)/code-gc $(CLAUDE_BIN_DIR)/prlink $(CLAUDE_BIN_DIR)/statusbar
+	@echo "unlinked find-skill / find-gem / code-gc / prlink / statusbar"
 
 clean: uninstall
 	cd rust && cargo clean

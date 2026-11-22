@@ -1,0 +1,18 @@
+{
+  "baseRefName": "main",
+  "baseRefOid": "4d24f2077db5c0a9eae49d0f674d4c66816e15d1",
+  "body": "The callbacks read the uuid unguarded, so a record loaded with a partial select raised `ActiveModel::MissingAttributeError` on every polyid model: `User.select(:id, :name).find(1).update!(name: \"x\")`, `.valid?`, and `.destroy`. A failed destroy also rolled back, so the row survived.\n\nThe [validation and canonicalise callbacks](https://github.com/dpep/polyid/blob/6d60201/lib/polyid/model.rb#L295) now skip when [the uuid isn't loaded](https://github.com/dpep/polyid/blob/6d60201/lib/polyid/model.rb#L277-L281). [Eviction](https://github.com/dpep/polyid/blob/6d60201/lib/polyid/model.rb#L319) drops just the id key in that case; the uuid key it can't name is harmless under the documented cache contract, since it resolves to a missing row.\n",
+  "headRefName": "partial-selects",
+  "headRefOid": "6d60201e4b38e8790af92e1e89e1240e5af2a81e",
+  "headRepository": {
+    "id": "R_kgDOQD-jbw",
+    "name": "polyid",
+    "nameWithOwner": "dpep/polyid"
+  },
+  "headRepositoryOwner": {
+    "id": "MDQ6VXNlcjkxODgwNA==",
+    "name": "Daniel Pepper",
+    "login": "dpep"
+  },
+  "state": "MERGED"
+}

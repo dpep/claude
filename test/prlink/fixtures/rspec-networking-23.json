@@ -1,0 +1,18 @@
+{
+  "baseRefName": "main",
+  "baseRefOid": "ddf572dee738f4aa0a59dc531da81d14f5beb4bd",
+  "body": "Fixes in [`be_a_mac_address`](https://github.com/dpep/rspec-networking/blob/24ec6f5/lib/rspec/networking/mac_address.rb):\n\n- **Partial matches:** the regexes used `^`/`$`, so `\"junk\\n00:00:00:00:00:00\"` matched. They're now anchored with `\\A`/`\\z`.\n- **IPv4 strings matched:** `expect(\"192.168.100.200\").to be_a_mac_address` passed, because of the [`MMM.MMM.SSS.SSS` form](https://github.com/dpep/rspec-networking/blob/0e7e7cb/lib/rspec/networking/mac_address.rb#L66). That isn't a real MAC notation. It's replaced with Cisco's `MMMM.MMSS.SSSS` ([`EUI48`](https://github.com/dpep/rspec-networking/blob/24ec6f5/lib/rspec/networking/mac_address.rb#L7)), which used to be rejected. `.from`/`.for` take colon or dash halves ([`HALF`](https://github.com/dpep/rspec-networking/blob/24ec6f5/lib/rspec/networking/mac_address.rb#L13)).\n- **64-bit form:** it now accepts dashes, like the 48-bit form.\n- **`from(123)`:** it raised `NoMethodError`; it now raises `ArgumentError`. [`.from`](https://github.com/dpep/rspec-networking/blob/24ec6f5/lib/rspec/networking/mac_address.rb#L25) now resolves the manufacturer to a prefix set once. Before, the exact-prefix vs. lookup decision was made [a second time](https://github.com/dpep/rspec-networking/blob/0e7e7cb/lib/rspec/networking/mac_address.rb#L94) with a looser regex.\n- **Messages:** RSpec now builds the failure messages from [`description`](https://github.com/dpep/rspec-networking/blob/24ec6f5/lib/rspec/networking/mac_address.rb#L92). This fixes `nil` showing as `''` and test names reading \"is expected to a MAC address\". The [`a_mac_address` alias](https://github.com/dpep/rspec-networking/blob/24ec6f5/lib/rspec/networking/mac_address.rb#L105) strips the \"be \" so composed messages still read `include {addr: (a MAC address)}`.\n\n**Behavior change:** `MMM.MMM.SSS.SSS` strings no longer match, so a release needs at least a minor bump. Each fix has a regression spec that fails on `main`. The spec also fixes an example meant to test dashes, which never did (`gsub(\"-\", \":\")` on colon-separated Faker output).\n",
+  "headRefName": "fix-mac-matcher",
+  "headRefOid": "28c1f4898827cf6b63fc2d42e5ef3ead49a47b7a",
+  "headRepository": {
+    "id": "R_kgDOMqudUg",
+    "name": "rspec-networking",
+    "nameWithOwner": "dpep/rspec-networking"
+  },
+  "headRepositoryOwner": {
+    "id": "MDQ6VXNlcjkxODgwNA==",
+    "name": "Daniel Pepper",
+    "login": "dpep"
+  },
+  "state": "MERGED"
+}

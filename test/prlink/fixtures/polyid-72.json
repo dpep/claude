@@ -1,0 +1,18 @@
+{
+  "baseRefName": "main",
+  "baseRefOid": "1b5523850ff1214274cdc0beb539be99af733afe",
+  "body": "\nIn `transaction { find(uuid).destroy! }`, the lookup's deferred cache write ran after the destroy's eviction, which left a stale entry. A record's `after_commit` callbacks run before callbacks queued on the transaction itself. The [eviction](https://github.com/dpep/polyid/blob/fa6547d/lib/polyid/model.rb#L295-L310) now runs [`after_destroy`](https://github.com/dpep/polyid/blob/fa6547d/lib/polyid/model.rb#L28) and queues its cache delete through [`polyid_after_commit`](https://github.com/dpep/polyid/blob/fa6547d/lib/polyid/model.rb#L164-L169), so it runs after the lookup's write. `polyid_after_commit` moves out of `private` so the instance callback can call it.\n",
+  "headRefName": "evict-ordering",
+  "headRefOid": "fa6547d55273785815fb46295948a3b016127abe",
+  "headRepository": {
+    "id": "R_kgDOQD-jbw",
+    "name": "polyid",
+    "nameWithOwner": "dpep/polyid"
+  },
+  "headRepositoryOwner": {
+    "id": "MDQ6VXNlcjkxODgwNA==",
+    "name": "Daniel Pepper",
+    "login": "dpep"
+  },
+  "state": "MERGED"
+}

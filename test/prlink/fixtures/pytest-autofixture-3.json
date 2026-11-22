@@ -1,0 +1,18 @@
+{
+  "baseRefName": "main",
+  "baseRefOid": "5cac35975a3d8a6b291acbc60e1c2b5bc511162b",
+  "body": "Fixtures can now reference other fixtures by bare name, as tests already can. This enables RSpec's nested-`let` override pattern: an outer `user` fixture reads `role`, and an inner test class overrides only `role`.\n\n### Change\n[`pytest_fixture_setup`](https://github.com/dpep/pytest-autofixture/blob/c9ca095/pytest_autofixture/__init__.py#L81) wraps fixture setup the way [`pytest_runtest_call`](https://github.com/dpep/pytest-autofixture/blob/c9ca095/pytest_autofixture/__init__.py#L73) wraps the test. Both share [`_swap`](https://github.com/dpep/pytest-autofixture/blob/c9ca095/pytest_autofixture/__init__.py#L53), which temporarily replaces `fixturedef.func` with a rebound copy. Bound fixture methods stay bound, so pytest's [`resolve_fixture_function`](https://github.com/pytest-dev/pytest/blob/9.1.1/src/_pytest/fixtures.py#L1271) still binds them to the test instance.\n\nThe rebound copy resolves names against the fixture's own `SubRequest`, so:\n- a session fixture that reads a function-scoped one raises `ScopeMismatch`, exactly as a declared parameter would\n- overrides resolve from the requesting test's position\n\nThe hook is `tryfirst`, so it rebinds the user's function before pytest-asyncio wraps it in its sync runner. Without that, an async fixture body sees the module-level `FixtureFunctionDefinition` instead of the value, which fails silently. A [test](https://github.com/dpep/pytest-autofixture/blob/c9ca095/tests/test_isolated.py#L160) guards the ordering. Its inner conftest wraps `fixturedef.func` the way pytest-asyncio does and loads after us. The test fails without `tryfirst`, and it needs no pytest-asyncio dependency.\n\nNew README limitation, which was also true before this PR: an async test can't lazily request an async fixture, because pytest-asyncio can't start a loop inside the running one. Declare it as a parameter instead.\n\n### Also in this PR\n- **Tests split by need.** [`tests/test_autofixture.py`](https://github.com/dpep/pytest-autofixture/blob/cfbd1e9/tests/test_autofixture.py) holds plain tests that use the plugin directly, so they double as usage examples. [`tests/test_isolated.py`](https://github.com/dpep/pytest-autofixture/blob/c9ca095/tests/test_isolated.py) keeps pytester only for what needs its own session: state across tests, expected failures, and suite-wide hooks.\n- **pytest's lookup errors come through.** Moving the tests surfaced a gap: on pytest 9.1+, a yield fixture that first uses a bare name after its `yield` got a misleading `NameError: ... no fixture by that name`. pytest refuses fixture lookups during teardown. [`__missing__`](https://github.com/dpep/pytest-autofixture/blob/c9ca095/pytest_autofixture/__init__.py#L30) now turns a `FixtureLookupError` into `NameError` only when it has no message, so pytest's own explanation comes through. Added to the README limitations.\n",
+  "headRefName": "fixture-bodies",
+  "headRefOid": "cfbd1e90c96e360a7c2d4f5ce1e7824e65f991c1",
+  "headRepository": {
+    "id": "R_kgDOMZ4-pQ",
+    "name": "pytest-autofixture",
+    "nameWithOwner": "dpep/pytest-autofixture"
+  },
+  "headRepositoryOwner": {
+    "id": "MDQ6VXNlcjkxODgwNA==",
+    "name": "Daniel Pepper",
+    "login": "dpep"
+  },
+  "state": "MERGED"
+}

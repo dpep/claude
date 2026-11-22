@@ -1,0 +1,18 @@
+{
+  "baseRefName": "main",
+  "baseRefOid": "be1ea2760f0bc0b961eb4fd603f2706fe8c119cf",
+  "body": "Fixes five bugs the suite didn't catch, simplifies the code they lived in, and refreshes CI. Each fix commit carries a regression test that failed first, plus its `CHANGES.txt` line under Unreleased. Reviewing commit by commit is easiest.\n\n### Bugs fixed\n- **Falsy instances:** `@ambiguous.method` checked `if obj:`, so an instance with `__len__() == 0` got the unbound function. [`_AmbiguousMethod`](https://github.com/dpep/py_ambiguous/blob/6b67bff/ambiguous/ambiguous.py#L43) now checks `is None`.\n- **Subclass classmethods:** on an `@ambiguous` class, classmethods were bound at decoration time, so `B.who()` on a subclass got `A` as `cls`. [`_AmbiguousDescriptor`](https://github.com/dpep/py_ambiguous/blob/6b67bff/ambiguous/ambiguous.py#L55) binds at lookup, and [`ambiguous_class`](https://github.com/dpep/py_ambiguous/blob/6b67bff/ambiguous/ambiguous.py#L73) walks `vars(cls)` instead of `inspect.getmembers` plus a type ladder.\n- **In-place ops:** `x = n; x += 1` raised `AttributeError` for int/str results. The in-place ops are now [excluded](https://github.com/dpep/py_ambiguous/blob/6b67bff/ambiguous/ops.py#L6), so Python falls back to `x = x + 1`; each access re-evaluates the function, so there is nothing to mutate anyway. Also stops scanning the `operator` module, which only added non-protocol names.\n- **`thing_or_things` keyword/default args:** `itself(args=[1, 2])` and default-valued things crashed. The call is now bound with [`inspect.signature`](https://github.com/dpep/py_ambiguous/blob/6b67bff/ambiguous/thing_or_things.py#L44), replacing the call-it-to-raise trick and its `assert` (stripped under `-O`).\n- **`@decorator` returning its target:** `update_wrapper(fn, fn)` made `fn` its own `__wrapped__`, so `inspect.signature` raised \"wrapper loop\". Fixed, and the three arg accumulators fold into one [`collect`](https://github.com/dpep/py_ambiguous/blob/6b67bff/ambiguous/decorator.py#L28).\n- Also fixes a `test_return_type` assertion (`assertTrue(dict, ...)`) that could never fail.\n\n### Other changes\n- **Callable module:** [`_CallableModule`](https://github.com/dpep/py_ambiguous/blob/6b67bff/ambiguous/__init__.py#L30) is assigned to the module's `__class__`, the supported mechanism, replacing the stand-in wrapper object with its spoofed `__class__`. `ambiguous` is now a real module, so `reload` and `isinstance(ambiguous, ModuleType)` behave normally.\n- **Breaking-ish:** `ambiguous()` on an unsupported type [raises `TypeError`](https://github.com/dpep/py_ambiguous/blob/6b67bff/ambiguous/ambiguous.py#L98) instead of `NotImplementedError`. Noted in the changelog.\n- **CI:** 3.15 added to the matrix and tox; checkout/setup-python v7, upload-artifact v7, download-artifact v8; plain `pull_request` trigger; read-only default token; Dependabot + auto-merge from `python_package_template`.\n- **Tests and housekeeping:** dropped the `sys.path` hacks, shebangs, a star import; extended `.gitignore`.\n- **README:** documents `@ambiguous` on classes plus two limitations (results don't persist mutation; pass callable `@decorator` options by keyword).\n\nNext release would be 0.5.2.\n",
+  "headRefName": "modernize-and-fix",
+  "headRefOid": "6b67bff52f15e434f557e83a754396ed785080f1",
+  "headRepository": {
+    "id": "MDEwOlJlcG9zaXRvcnkxMjI1NDgyODM=",
+    "name": "py_ambiguous",
+    "nameWithOwner": "dpep/py_ambiguous"
+  },
+  "headRepositoryOwner": {
+    "id": "MDQ6VXNlcjkxODgwNA==",
+    "name": "Daniel Pepper",
+    "login": "dpep"
+  },
+  "state": "CLOSED"
+}

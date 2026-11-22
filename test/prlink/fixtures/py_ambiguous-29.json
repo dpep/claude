@@ -1,0 +1,18 @@
+{
+  "baseRefName": "main",
+  "baseRefOid": "a5ae4ec6a2543f2e89ad144e1cbbcc2e8480ffc2",
+  "body": "`thing_or_things` fixes from the last bug hunt:\n\n- **`self` was picked as the thing.** With keyword-only things (#17), `def get(self, *, ids)` treated `self` as the thing because it was the only positional parameter, and the call then failed with \"'int' object is not iterable\". [Candidates now skip `self` / `cls`](https://github.com/dpep/py_ambiguous/blob/fae9c87/ambiguous/thing_or_things.py#L52-L58). As a side effect, `def get(self, ids)` no longer needs `@thing_or_things('ids')`.\n- **A frozenset was treated as one thing.** `ident(frozenset({1, 2}))` returned the frozenset itself with no error. It [now counts as many things](https://github.com/dpep/py_ambiguous/blob/fae9c87/ambiguous/thing_or_things.py#L82), like a set. Range, generators and dict views still count as single things, as the docstring says. The README PR will spell this out.\n- **Unhashable things failed after `fn` had already run**, and the error didn't name the function. They're [now checked before the call](https://github.com/dpep/py_ambiguous/blob/fae9c87/ambiguous/thing_or_things.py#L84-L89).\n- **Missing and extra keys were listed in set order**, which differed between 3.12 and 3.14. They're [now listed in the order of the input and the result](https://github.com/dpep/py_ambiguous/blob/fae9c87/ambiguous/thing_or_things.py#L102-L109).\n- **Async functions** got \"must return a dict or None, got coroutine\" plus a never-awaited warning. They're now [rejected at decoration time](https://github.com/dpep/py_ambiguous/blob/fae9c87/ambiguous/thing_or_things.py#L23-L24).\n\nTests: [`test_methods`, `test_method_hint`, `test_async`](https://github.com/dpep/py_ambiguous/blob/fae9c87/tests/test_thing_or_things.py#L172-L203), [frozensets](https://github.com/dpep/py_ambiguous/blob/fae9c87/tests/test_thing_or_things.py#L300-L301), and [`test_unhashable_thing` and `test_key_order`](https://github.com/dpep/py_ambiguous/blob/fae9c87/tests/test_thing_or_things.py#L339-L359).\n",
+  "headRefName": "thing-or-things-fixes",
+  "headRefOid": "fae9c8778af71bcdf404766ee3abec72f23bb92a",
+  "headRepository": {
+    "id": "MDEwOlJlcG9zaXRvcnkxMjI1NDgyODM=",
+    "name": "py_ambiguous",
+    "nameWithOwner": "dpep/py_ambiguous"
+  },
+  "headRepositoryOwner": {
+    "id": "MDQ6VXNlcjkxODgwNA==",
+    "name": "Daniel Pepper",
+    "login": "dpep"
+  },
+  "state": "MERGED"
+}

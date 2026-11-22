@@ -1,0 +1,1697 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# prlink: find the code references in a PR description and link each to a
+# permalink pinned at the PR's base or head commit. `prlink --help` for usage.
+#
+# One pass finds every ref (Markdown.scan marks what is prose and what is not),
+# Linker resolves each to candidates and picks one only when it is sure, and the
+# outputs consume that list: --json/--ndjson report it, the default prints the
+# body with the chosen links applied. Stdlib only, Ruby 2.6.
+
+require "json"
+require "open3"
+require "optparse"
+require "fileutils"
+require "tmpdir"
+
+module Prlink
+  CODE_EXT = %w[rb rbi rake erb haml slim gemspec rs go py ts tsx js jsx mjs c h cc cpp java kt swift
+                sh bash zsh yml yaml json toml md sql proto graphql gql lock txt].freeze
+  IDENT = /[A-Za-z_][A-Za-z0-9_]*[?!=]?/.freeze
+  # A leading underscore is Python's private-class convention (`_LiveGlobals`).
+  CONST = /\A(?:::)?_*[A-Z]\w*(?:::_*[A-Z]\w*)*\z/.freeze
+  QUALIFIED = /\A((?:::)?[A-Za-z_]\w*(?:::[A-Za-z_]\w*)*)(#|\.|::)(#{IDENT})\z/.freeze
+  STATUSES = %w[linked ambiguous unresolved left_alone existing_ok existing_wrong existing_stale existing_unpinned].freeze
+  REVIEW = %w[ambiguous unresolved existing_wrong existing_stale existing_unpinned].freeze
+  # An inherited GIT_DIR would point every `git -C` at some other repository.
+  GIT_ENV = { "GIT_DIR" => nil, "GIT_WORK_TREE" => nil, "GIT_INDEX_FILE" => nil }.freeze
+
+  class UsageError < StandardError; end
+
+  Candidate = Struct.new(:url, :repo, :sha, :side, :path, :line, :end_line, :tool, :evidence, :owner, keyword_init: true) do
+    def as_json
+      to_h.map { |k, v| [k.to_s, v] }.to_h
+    end
+  end
+
+  Outcome = Struct.new(:status, :reason, :cause, :candidates, :chosen, :where, keyword_init: true)
+
+  Ref = Struct.new(:start, :stop, :line, :col, :text, :query, :shape, :status, :reason, :cause, :where,
+                   :candidates, :chosen, :existing, :url_start, :url_stop, keyword_init: true) do
+    def apply(o)
+      self.status = o.status
+      self.reason = o.reason
+      self.cause = o.cause
+      self.where = o.where
+      self.candidates = Array(o.candidates)
+      self.chosen = o.chosen
+      self
+    end
+
+    def as_json
+      {
+        "span" => { "line" => line, "col" => col, "text" => text },
+        "shape" => shape, "query" => query, "status" => status, "cause" => cause, "reason" => reason,
+        "where" => where, "candidates" => candidates.map(&:as_json), "chosen" => chosen&.as_json,
+        "existing" => existing
+      }
+    end
+  end
+
+  # ---------- markdown ----------
+
+  # A small CommonMark scanner: finds the places a ref may live (code spans,
+  # inline links, plain prose) and skips everything rendered verbatim or owned
+  # by markup (fences, indented code, HTML, autolinks, reference links and
+  # definitions, images, blockquotes). Offsets are character indexes into the text.
+  module Markdown
+    Site = Struct.new(:kind, :start, :stop, :code, :text, :url, :url_start, :url_stop, keyword_init: true)
+
+    BLOCK_TAGS = %w[address article aside base basefont blockquote body caption center col colgroup dd details
+                    dialog dir div dl dt fieldset figcaption figure footer form frame frameset h1 h2 h3 h4 h5 h6
+                    head header hr html iframe legend li link main menu menuitem nav noframes ol optgroup option
+                    p param search section summary table tbody td tfoot th thead title tr track ul].freeze
+    VERBATIM_TAGS = %w[code pre kbd samp tt var].freeze
+    ATTR = /\s+[A-Za-z_:][\w.:-]*(?:\s*=\s*(?:[^\s"'=<>`]+|'[^']*'|"[^"]*"))?/.freeze
+    OPEN_TAG = %r{<[A-Za-z][A-Za-z0-9-]*(?:#{ATTR})*\s*/?>}.freeze
+    CLOSE_TAG = %r{</[A-Za-z][A-Za-z0-9-]*\s*>}.freeze
+    PUNCT = /[!-\/:-@\[-`{-~]/.freeze
+
+    module_function
+
+    def scan(text)
+      labels = text.scan(/^ {0,3}\[((?:[^\]\\^]|\\.)(?:[^\]\\]|\\.)*)\]:/).map { |(l)| label(l) }
+      sites = []
+      each_block(text) { |from, to| inline(text, from, to, labels, sites) }
+      sites
+    end
+
+    def label(s)
+      s.strip.downcase.gsub(/\s+/, " ")
+    end
+
+    # Yields [from, to) of each run of prose lines that inline markup can span.
+    def each_block(text)
+      fence = nil
+      html_end = nil
+      prev = :blank
+      list_indent = nil
+      block = nil
+      flush = lambda do
+        yield(*block) if block
+        block = nil
+      end
+      pos = 0
+      text.each_line do |raw|
+        from = pos
+        pos += raw.size
+        line = raw.chomp
+        to = from + line.size
+        if fence
+          fence = nil if line.match?(/\A\s*#{Regexp.escape(fence[0])}{#{fence[1]},}\s*\z/)
+          next
+        end
+        if html_end
+          if html_end == :blank
+            if line.strip.empty?
+              html_end = nil
+              prev = :blank
+            end
+          elsif line.match?(html_end)
+            html_end = nil
+          end
+          next
+        end
+        if line.strip.empty?
+          flush.call
+          prev = :blank
+          next
+        end
+        indent = line[/\A[ \t]*/].gsub("\t", "    ").size
+        if (m = line.match(/\A\s*(`{3,}|~{3,})(.*)\z/)) && !(m[1][0] == "`" && m[2].include?("`"))
+          flush.call
+          fence = [m[1][0], m[1].size]
+          prev = :fence
+          next
+        end
+        # Indented code cannot interrupt a paragraph; inside a list item it starts
+        # four columns past the item's text.
+        if indent >= 4 && %i[blank code].include?(prev) && !(list_indent && indent < list_indent + 4)
+          flush.call
+          prev = :code
+          next
+        end
+        if line.match?(/\A {0,3}>/) || (prev == :quote && block.nil?)
+          flush.call
+          prev = :quote
+          next
+        end
+        if indent < 4 && (cond = html_start(line.lstrip, block.nil?))
+          flush.call
+          rest = line.lstrip[2..].to_s
+          html_end = cond unless cond != :blank && rest.match?(cond)
+          prev = :html
+          next
+        end
+        # Strictly a definition cannot interrupt a paragraph; one that reads like a definition is left alone anyway.
+        if indent < 4 && line.match?(/\A {0,3}\[(?!\^)(?:[^\]\\]|\\.)+\]:/)
+          flush.call
+          prev = :refdef
+          next
+        end
+        if (m = line.match(/\A(\s*)([-*+]|\d{1,9}[.)])(\s+|\z)/))
+          flush.call
+          gap = m[3].size.between?(1, 4) ? m[3].size : 1
+          list_indent = m[1].size + m[2].size + gap
+          block = [from, to]
+        elsif line.match?(/\A {0,3}(?:\#{1,6}(?:\s|\z)|\|)/) || line.match?(/\A {0,3}\[\^[^\]]+\]:/)
+          # Headings and table rows are one-line blocks; a footnote starts a new one.
+          flush.call
+          block = [from, to]
+          flush.call
+        else
+          list_indent = nil if indent.zero? && prev == :blank
+          block ? block[1] = to : block = [from, to]
+        end
+        prev = :para
+      end
+      flush.call
+    end
+
+    # The end condition of the HTML block `line` opens, or nil.
+    def html_start(line, para_free)
+      return %r{</(?:script|pre|style|textarea)>}i if line.match?(/\A<(?:script|pre|style|textarea)(?:\s|>|\z)/i)
+      return /-->/ if line.start_with?("<!--")
+      return /\?>/ if line.start_with?("<?")
+      return /\]\]>/ if line.start_with?("<![CDATA[")
+      return />/ if line.match?(/\A<![A-Za-z]/)
+
+      m = line.match(%r{\A</?([A-Za-z][A-Za-z0-9-]*)(?:\s|/?>|\z)})
+      return :blank if m && BLOCK_TAGS.include?(m[1].downcase)
+      return :blank if para_free && line.match?(/\A(?:#{OPEN_TAG}|#{CLOSE_TAG})\s*\z/)
+
+      nil
+    end
+
+    def inline(text, from, to, labels, sites)
+      i = from
+      plain = from
+      emit = lambda do |upto|
+        sites << Site.new(kind: :text, start: plain, stop: upto) if upto > plain
+      end
+      while (i = text.index(/[\\`<!\[hw]/, i)) && i < to
+        c = text[i]
+        if c == "\\"
+          i += i + 1 < to && text[i + 1].match?(PUNCT) ? 2 : 1
+        elsif c == "`"
+          n = run(text, i, to)
+          close = code_close(text, i + n, n, to)
+          if close
+            emit.call(i)
+            sites << Site.new(kind: :code, start: i, stop: close + n, code: code_content(text[i + n...close]))
+            i = plain = close + n
+          else
+            i += n
+          end
+        elsif c == "<"
+          stop = html_inline(text, i, to)
+          if stop
+            emit.call(i)
+            i = plain = stop
+          else
+            i += 1
+          end
+        elsif c == "!"
+          kind, stop, = text[i + 1] == "[" ? bracket(text, i + 1, to, labels) : nil
+          if kind
+            emit.call(i)
+            i = plain = stop
+          else
+            i += 1
+          end
+        elsif c == "["
+          kind, stop, info = bracket(text, i, to, labels)
+          if kind
+            emit.call(i)
+            if kind == :link
+              sites << Site.new(kind: :link, start: i, stop: stop, text: info[:text], url: info[:url],
+                                url_start: info[:url_start], url_stop: info[:url_stop])
+            end
+            i = plain = stop
+          else
+            i += 1
+          end
+        elsif (i == from || !text[i - 1].match?(/[[:alnum:]_]/)) && (m = text.match(%r{\G(?:https?://|www\.)[^\s<]*}, i))
+          emit.call(i)
+          i = plain = [i + m[0].size, to].min
+        else
+          i += 1
+        end
+      end
+      emit.call(to)
+    end
+
+    def run(text, i, to)
+      n = 0
+      n += 1 while i + n < to && text[i + n] == "`"
+      n
+    end
+
+    # Start of the backtick run of exactly n that closes a code span, or nil.
+    def code_close(text, j, n, to)
+      while (k = text.index("`", j)) && k < to
+        m = run(text, k, to)
+        return k if m == n
+
+        j = k + m
+      end
+      nil
+    end
+
+    def code_content(raw)
+      c = raw.gsub(/\r?\n/, " ")
+      c.size >= 2 && c.start_with?(" ") && c.end_with?(" ") && !c.strip.empty? ? c[1...-1] : c
+    end
+
+    # An autolink, comment or tag at i: where it ends. <code>-like tags run to
+    # their closing tag, since what they hold renders verbatim.
+    def html_inline(text, i, to)
+      m = text.match(/\G<[A-Za-z][A-Za-z0-9.+-]{1,31}:[^<>\s]*>/, i) ||
+          text.match(%r{\G<[A-Za-z0-9.!\#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9][A-Za-z0-9.-]*>}, i)
+      return i + m[0].size if m && i + m[0].size <= to
+
+      if text[i, 4] == "<!--"
+        k = text.index("-->", i + 4)
+        return k && k + 3 <= to ? k + 3 : nil
+      end
+      if (m = text.match(/\G#{OPEN_TAG}/, i))
+        stop = i + m[0].size
+        return nil if stop > to
+
+        name = m[0][/\A<([A-Za-z0-9-]+)/, 1].downcase
+        if VERBATIM_TAGS.include?(name) && !m[0].end_with?("/>")
+          close = text.match(%r{</#{name}\s*>}i, stop)
+          stop = close && close.end(0) <= to ? close.end(0) : to
+        end
+        return stop
+      end
+      m = text.match(/\G#{CLOSE_TAG}/, i)
+      m && i + m[0].size <= to ? i + m[0].size : nil
+    end
+
+    # What a `[` at i opens: [:link, stop, info] for an inline link,
+    # [:protect, stop] for a reference link or footnote, nil for plain brackets.
+    def bracket(text, i, to, labels)
+      if text[i + 1] == "^" && (k = text.index("]", i)) && k < to
+        return [:protect, k + 1]
+      end
+
+      close = bracket_close(text, i, to) or return
+      if text[close + 1] == "(" && (dest = destination(text, close + 1, to))
+        return [:link, dest[:stop], dest.merge(text: text[i + 1...close])]
+      end
+      if text[close + 1] == "[" && (k = text.index("]", close + 2)) && k < to
+        return [:protect, k + 1]
+      end
+      return [:protect, close + 1] if labels.include?(label(text[i + 1...close]))
+
+      nil
+    end
+
+    def bracket_close(text, i, to)
+      depth = 0
+      j = i
+      while j < to
+        case text[j]
+        when "\\"
+          j += 2
+          next
+        when "`"
+          n = run(text, j, to)
+          close = code_close(text, j + n, n, to)
+          j = close ? close + n : j + n
+          next
+        when "["
+          depth += 1
+        when "]"
+          depth -= 1
+          return j if depth.zero?
+        end
+        j += 1
+      end
+      nil
+    end
+
+    # An inline link's `(destination "title")` starting at p: its URL and end.
+    def destination(text, p, to)
+      j = p + 1
+      j += 1 while j < to && text[j].match?(/\s/)
+      if text[j] == "<"
+        k = text.index(">", j)
+        return unless k && k < to && !text[j...k].include?("\n")
+
+        url_start = j + 1
+        url_stop = k
+        j = k + 1
+      else
+        url_start = j
+        depth = 0
+        while j < to
+          ch = text[j]
+          break if ch.match?(/\s/)
+
+          if ch == "\\"
+            j += 2
+            next
+          end
+          if ch == "("
+            depth += 1
+          elsif ch == ")"
+            break if depth.zero?
+
+            depth -= 1
+          end
+          j += 1
+        end
+        url_stop = j
+      end
+      j += 1 while j < to && text[j].match?(/\s/)
+      if (closer = { '"' => '"', "'" => "'", "(" => ")" }[text[j]])
+        k = text.index(closer, j + 1)
+        return unless k && k < to
+
+        j = k + 1
+        j += 1 while j < to && text[j].match?(/\s/)
+      end
+      return unless text[j] == ")"
+
+      { url: text[url_start...url_stop], url_start: url_start, url_stop: url_stop, stop: j + 1 }
+    end
+  end
+
+  # ---------- git ----------
+
+  class Git
+    attr_reader :dir
+
+    def initialize(dir)
+      @dir = dir
+      @shows = {}
+      @trees = {}
+      @hunks = {}
+    end
+
+    def run(*args)
+      out, _err, st = Open3.capture3(GIT_ENV, "git", "-c", "core.quotepath=off", "-C", dir, *args)
+      st.success? ? out.force_encoding(Encoding::UTF_8).scrub : nil
+    end
+
+    def toplevel
+      run("rev-parse", "--show-toplevel")&.strip
+    end
+
+    def shallow?
+      run("rev-parse", "--is-shallow-repository")&.strip == "true"
+    end
+
+    def rev(ref)
+      run("rev-parse", "--verify", "--quiet", "#{ref}^{commit}")&.strip
+    end
+
+    def short(sha)
+      run("rev-parse", "--short=7", sha).strip
+    end
+
+    def pushed?(sha)
+      !run("branch", "-r", "--contains", sha).to_s.strip.empty?
+    end
+
+    def lines(sha, path)
+      @shows.fetch([sha, path]) do
+        out = run("show", "#{sha}:#{path}")
+        @shows[[sha, path]] = out&.lines&.map(&:chomp)
+      end
+    end
+
+    # {path => "blob" | "commit" (a submodule)}
+    def tree(sha)
+      @trees[sha] ||= run("ls-tree", "-r", "-z", sha).to_s.split("\0").map do |e|
+        meta, path = e.split("\t", 2)
+        [path, meta.split(" ")[1]]
+      end.to_h
+    end
+
+    def files(sha)
+      tree(sha).keys
+    end
+
+    def changed(base, head)
+      run("diff", "--no-renames", "--name-status", "-z", base, head).to_s.split("\0").each_slice(2).map do |st, path|
+        [path, st[0]]
+      end.to_h
+    end
+
+    # [[old_start, old_count, new_start, new_count], ...]
+    def hunks(base, head, path)
+      @hunks[[base, head, path]] ||= run("diff", "--no-renames", "-U0", base, head, "--", path).to_s.lines.map do |l|
+        m = l.match(/^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/) or next
+        [m[1].to_i, (m[2] || 1).to_i, m[3].to_i, (m[4] || 1).to_i]
+      end.compact
+    end
+
+    # Diff lines touched on each side: {path => {head: [lineno...], base: [lineno...]}}
+    def touched_lines(base, head)
+      out = run("diff", "--no-renames", "-U0", base, head).to_s
+      res = Hash.new { |h, k| h[k] = { head: [], base: [] } }
+      path = nil
+      old_ln = new_ln = 0
+      out.each_line do |l|
+        if l.start_with?("+++ ")
+          # git marks a path holding a space with a trailing tab.
+          path = l[4..].chomp.chomp("\t").sub(%r{\Ab/}, "")
+          path = nil if path == "/dev/null"
+        elsif l.start_with?("--- ")
+          old = l[4..].chomp.chomp("\t").sub(%r{\Aa/}, "")
+          path = old unless old == "/dev/null"
+        elsif (m = l.match(/^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/))
+          old_ln = m[1].to_i
+          new_ln = m[2].to_i
+        elsif path && l.start_with?("+")
+          res[path][:head] << new_ln
+          new_ln += 1
+        elsif path && l.start_with?("-")
+          res[path][:base] << old_ln
+          old_ln += 1
+        end
+      end
+      res
+    end
+
+    # Head line -> base line when the line is outside every hunk, else nil.
+    def base_line(base, head, path, line)
+      offset = 0
+      hunks(base, head, path).each do |os, oc, ns, nc|
+        new_end = nc.zero? ? ns : ns + nc - 1
+        return nil if nc.positive? && line.between?(ns, new_end)
+        break if line < (nc.zero? ? ns + 1 : ns)
+
+        offset += oc - nc
+      end
+      line + offset
+    end
+  end
+
+  # ---------- tool wrappers ----------
+
+  class Tool
+    attr_reader :bin
+
+    def initialize(bin)
+      @bin = bin
+      @cache = {}
+    end
+
+    def ok?
+      return @ok unless @ok.nil?
+
+      @ok = begin
+        Open3.capture3(@bin, "--version")[2].success?
+      rescue SystemCallError
+        false
+      end
+    end
+
+    # How the report names it: the tool, and the binary when it is not the default.
+    def name
+      tool = self.class.name.split("::").last.downcase
+      @bin == tool ? tool : "#{tool} (#{@bin})"
+    end
+
+    # [parsed JSON or nil, exit status or nil]
+    def call(dir, *args)
+      @cache.fetch([dir, args]) do
+        @cache[[dir, args]] = begin
+          out, _err, st = Open3.capture3(@bin, *args, chdir: dir)
+          v = JSON.parse(out)
+          [v.is_a?(Hash) && v["error"] ? nil : v, st.exitstatus]
+        rescue JSON::ParserError
+          [nil, st&.exitstatus]
+        rescue SystemCallError
+          @ok = false
+          [nil, nil]
+        end
+      end
+    end
+
+    def rows(dir, *args)
+      v = call(dir, *args).first
+      v.is_a?(Array) ? v : []
+    end
+
+    def answer(dir, *args)
+      v = call(dir, *args).first
+      v.is_a?(Hash) ? v : nil
+    end
+  end
+
+  class Trekr < Tool
+    def card(dir, q)
+      answer(dir, q, "--json")
+    end
+
+    def refs(dir, name)
+      rows(dir, "--refs", name, "--json")
+    end
+
+    def symbols(dir, path)
+      rows(dir, "--symbols", path, "--json")
+    end
+
+    def def_at(dir, path, line, col)
+      answer(dir, "--def", "#{path}:#{line}:#{col}", "--json")
+    end
+
+    def index(dir)
+      system(@bin, "--index", dir, out: File::NULL, err: File::NULL)
+    rescue SystemCallError
+      @ok = false
+    end
+
+    def ruby(dir)
+      status = answer(dir, "--status", "--json") || {}
+      (Array(status["checkouts"]).first || {})["ruby"] || {}
+    end
+  end
+
+  class Rq < Tool
+    # [rows, warming]: exit 2 or a `warming` row means the index was still being built.
+    def query(dir, q)
+      v, st = call(dir, q, "--json", "-l", "0", "--wait", "2m")
+      rows = v.is_a?(Array) ? v : []
+      [rows, st == 2 || rows.any? { |r| r["warming"] || r["provisional"] }]
+    end
+
+    def symbols(dir, path)
+      rows(dir, "--symbols", path, "--json")
+    end
+  end
+
+  # ---------- the run ----------
+
+  class Linker
+    attr_reader :warnings
+
+    def initialize(git:, base_repo:, head_repo:, base:, head:, trekr:, rq:, cache:)
+      @git = git
+      @base_repo = base_repo
+      @head_repo = head_repo
+      @base = base
+      @head = head
+      @trekr = trekr
+      @rq = rq
+      @cache = cache
+      @changed = git.changed(base, head)
+      @memo = {}
+      @warnings = []
+    end
+
+    def sha(side)
+      side == :head ? @head : @base
+    end
+
+    def repo(side)
+      side == :head ? @head_repo : @base_repo
+    end
+
+    def short(side)
+      @git.short(sha(side))
+    end
+
+    # Tools this repo's refs need that are not on PATH.
+    def tools_missing
+      [(@trekr if ruby_repo?), (@rq if other_code?)].compact.reject(&:ok?).map(&:name)
+    end
+
+    def snapshot(side)
+      snapshot_at(sha(side))
+    end
+
+    # A shared clone checked out at the sha, so trekr and rq answer for that commit
+    # without touching the user's checkout.
+    def snapshot_at(s)
+      @snapshots ||= {}
+      @snapshots[s] ||= begin
+        dir = File.join(@cache, @base_repo.sub("/", "__"), s)
+        unless File.directory?(File.join(dir, ".git"))
+          FileUtils.mkdir_p(File.dirname(dir))
+          tmp = "#{dir}.tmp#{Process.pid}"
+          system(GIT_ENV, "git", "clone", "-q", "--shared", "--no-checkout", @git.dir, tmp, exception: true)
+          system(GIT_ENV, "git", "-C", tmp, "checkout", "-q", "--detach", s, exception: true)
+          File.rename(tmp, dir)
+        end
+        dir = File.realpath(dir) # trekr and rq report roots resolved (/var -> /private/var)
+        # A query on a cold checkout can answer while its first index is still running.
+        @trekr.index(dir) if ruby_repo? && @trekr.ok?
+        dir
+      end
+    end
+
+    def other_code?
+      return @other_code if defined?(@other_code)
+
+      @other_code = @git.files(@head).any? { |f| f.match?(/\.(rs|go|py|tsx?|jsx?|mjs)\z/) && !f.match?(%r{(\A|/)(node_modules|vendor)/}) }
+    end
+
+    def ruby_repo?
+      return @ruby_repo if defined?(@ruby_repo)
+
+      @ruby_repo = @git.files(@head).any? { |f| f.end_with?(".rb") }
+    end
+
+    # ---------- finding refs ----------
+
+    PATH_CHARS = %r{[[:alnum:]_.\-/]}.freeze
+    BARE_LINE = %r{(?<![[:alnum:]_/.`\[\-@:])((?:[[:alnum:]_.\-]+/)*[[:alnum:]_.\-]+\.[A-Za-z0-9]+)(\#L(\d+)(?:-L(\d+))?|:(\d+)(?:-(\d+))?)(?![[:alnum:]_`\]\-])}.freeze
+    BARE_PATH = %r{(?<![[:alnum:]_/.`\[\-@:\#])((?:[[:alnum:]_.\-]+/)*[[:alnum:]_\-]+\.[A-Za-z0-9]+|(?:[[:alnum:]_.\-]+/)+[[:alnum:]_\-]+)(?![[:alnum:]_/`\]\-]|\.[[:alnum:]])}.freeze
+
+    def analyze(body)
+      @body = body
+      Markdown.scan(body).flat_map do |site|
+        case site.kind
+        when :code then [code_ref(site)]
+        when :link then [link_ref(site)].compact
+        else text_refs(site)
+        end
+      end
+    end
+
+    def new_ref(start, stop, shape)
+      nl = start.zero? ? nil : @body.rindex("\n", start - 1)
+      Ref.new(start: start, stop: stop, text: @body[start...stop], shape: shape,
+              line: @body[0...start].count("\n") + 1, col: start - (nl || -1))
+    end
+
+    def code_ref(site)
+      code = site.code.strip
+      call = code.end_with?("()")
+      code = code.delete_suffix("()")
+      shape, run = classify(code, call)
+      ref = new_ref(site.start, site.stop, shape)
+      ref.query = code
+      ref.apply(@memo[[:code, code, call]] ||= run.call)
+    end
+
+    def text_refs(site)
+      text = @body[site.start...site.stop]
+      refs = []
+      taken = []
+      text.to_enum(:scan, BARE_LINE).each do
+        m = Regexp.last_match
+        first = (m[3] || m[5]).to_i
+        last = (m[4] || m[6])&.to_i
+        start = site.start + m.begin(0)
+        stop = site.start + m.end(0)
+        ref = new_ref(start, stop, last ? "range" : "path_line")
+        ref.query = m[0]
+        # A backtick beside it closes a code span: the author likely meant the path inside one.
+        out = if (start.positive? && @body[start - 1] == "`") || @body[stop] == "`"
+                left("beside a backtick that closes a code span; check the backticks around it")
+              else
+                @memo[[:bare, m[0]]] ||= resolve_path(m[1], first, last)
+              end
+        refs << ref.apply(out)
+        taken << (m.begin(0)...m.end(0))
+      end
+      text.to_enum(:scan, BARE_PATH).each do
+        m = Regexp.last_match
+        next if taken.any? { |r| r.cover?(m.begin(0)) }
+
+        path = m[1]
+        next unless exists_anywhere?(path)
+
+        ref = new_ref(site.start + m.begin(0), site.start + m.end(0), "plain_path")
+        ref.query = path
+        cand = file_cand(path)
+        refs << ref.apply(left("a path in plain text; put it in backticks to link it", [cand]))
+      end
+      refs.sort_by(&:start)
+    end
+
+    # The shape of a code span and how to resolve it.
+    def classify(c, call)
+      if (m = c.match(/\A(.+?)(?:#L(\d+)(?:-L(\d+))?|:(\d+)(?:-(\d+))?)\z/)) && path_like?(m[1])
+        first = (m[2] || m[4]).to_i
+        last = (m[3] || m[5])&.to_i
+        return [last ? "range" : "path_line", -> { resolve_path(m[1], first, last) }]
+      end
+      return ["path", -> { resolve_path(c, nil, nil, strict: c.include?("/") || code_ext?(c)) }] if path_like?(c)
+      return ["other", -> { left("not a path, constant or method name") }] if c.empty? || c.start_with?("-")
+      return ["other", -> { left("holds spaces, and is not a file at head or base") }] if c.match?(/\s/)
+      return ["constant", -> { resolve_constant(c.delete_prefix("::")) }] if c.match?(CONST)
+      if (m = c.match(QUALIFIED))
+        return ["owner_method", -> { resolve_qualified(m[1].delete_prefix("::"), m[2], m[3]) }]
+      end
+      if (m = c.match(/\A[#.](#{IDENT})\z/))
+        return ["bare_method", -> { resolve_bare_ref(m[1], true) }]
+      end
+      return ["bare_method", -> { resolve_bare_ref(c, call) }] if c.match?(/\A#{IDENT}\z/) && c.match?(/\A[a-z_]/)
+
+      ["other", -> { left("not a path, constant or method name") }]
+    end
+
+    # ---------- outcomes ----------
+
+    def linked(cand, reason = nil)
+      Outcome.new(status: "linked", chosen: cand, candidates: [cand], reason: reason)
+    end
+
+    def ambiguous(reason, cands)
+      Outcome.new(status: "ambiguous", reason: reason, candidates: cands)
+    end
+
+    def unresolved(reason, cause: "not_found", where: nil, cands: [])
+      Outcome.new(status: "unresolved", reason: reason, cause: cause, where: where, candidates: cands)
+    end
+
+    def left(reason, cands = [])
+      Outcome.new(status: "left_alone", reason: reason, candidates: cands)
+    end
+
+    def existing(status, reason, chosen: nil, cands: [])
+      Outcome.new(status: status, reason: reason, chosen: chosen, candidates: chosen ? [chosen, *cands] : cands)
+    end
+
+    def cand(side, path, line = nil, tool:, end_line: nil, owner: nil)
+      src = @git.lines(sha(side), path)
+      Candidate.new(url: blob_url(side, path, line, end_line), repo: repo(side), sha: sha(side), side: side.to_s,
+                    path: path, line: line, end_line: end_line, tool: tool, owner: owner,
+                    evidence: line && src && src[line - 1]&.strip)
+    end
+
+    def file_cand(path)
+      on_base = @git.lines(@base, path)
+      side = (@changed.key?(path) && @git.lines(@head, path)) || !on_base ? :head : :base
+      cand(side, path, tool: "git")
+    end
+
+    # A definition trekr or rq found outside this checkout: no URL, just where.
+    def outside_cand(d, tool, owner: nil)
+      Candidate.new(path: site_s(d), line: d["line"], tool: tool, owner: owner)
+    end
+
+    def code_ext?(s)
+      CODE_EXT.include?(File.extname(s).delete_prefix(".").downcase)
+    end
+
+    def path_like?(s)
+      return exists_anywhere?(s) if s.match?(/\s/)
+      return false unless s.match?(%r{\A#{PATH_CHARS}+\z}) && !s.start_with?("/")
+      return true if s.include?("/") && (code_ext?(s) || exists_anywhere?(s))
+
+      (code_ext?(s) && s.match?(/\A[[:alnum:]_.\-]+\.\w+\z/)) || exists_anywhere?(s)
+    end
+
+    def exists_anywhere?(s)
+      [@head, @base].any? { |sh| @git.tree(sh).key?(s) }
+    end
+
+    # ---------- paths ----------
+
+    def find_path(p)
+      [@head, @base].each do |sh|
+        return [p] if @git.tree(sh).key?(p)
+      end
+      both = (@git.files(@head) + @git.files(@base)).uniq
+      hits = both.select { |f| f.end_with?("/#{p}") }
+      # A short name in a PR description means the PR's own file when only one hit is touched.
+      touched = hits.select { |f| @changed.key?(f) }
+      touched.size == 1 ? touched : hits
+    end
+
+    def submodule_of(p)
+      [@head, @base].each do |sh|
+        @git.tree(sh).each { |path, type| return path if type == "commit" && (p == path || p.start_with?("#{path}/")) }
+      end
+      nil
+    end
+
+    def resolve_path(p, first, last, strict: true)
+      if (sub = submodule_of(p))
+        return unresolved("#{p} is in the submodule #{sub}; link it in that repo", cause: "external", where: sub)
+      end
+
+      hits = find_path(p)
+      if hits.empty?
+        return strict ? unresolved("no file #{p} at head or base") : left("not a file at head or base")
+      end
+      return ambiguous("#{p} names #{hits.size} files", hits.map { |h| file_cand(h) }) if hits.size > 1
+
+      path = hits.first
+      return linked(file_cand(path)) unless first
+
+      hi = last || first
+      return unresolved("#{p}: the range ends before it starts") if hi < first
+
+      on_head = @git.lines(@head, path)
+      on_base = @git.lines(@base, path)
+      head_ok = on_head && hi <= on_head.size
+      base_ok = on_base && hi <= on_base.size
+      side =
+        if !@changed.key?(path) then (:base if base_ok)
+        elsif head_ok && base_ok && same_place?(path, first, hi) then :base
+        elsif head_ok && !base_ok then :head
+        elsif base_ok && !head_ok then :base
+        end
+      return linked(cand(side, path, first, end_line: last, tool: "git")) if side
+      return unresolved("#{path} has no line #{hi} at head or base") unless head_ok || base_ok
+
+      cands = [(cand(:base, path, first, end_line: last, tool: "git") if base_ok),
+               (cand(:head, path, first, end_line: last, tool: "git") if head_ok)].compact
+      where = last ? "#{path}#L#{first}-L#{last}" : "#{path}#L#{first}"
+      same = (first..hi).all? { |l| on_head[l - 1] == on_base[l - 1] }
+      why = same ? "reads the same at base and head, but the PR changed or moved the code around it" : "differs between base and head"
+      ambiguous("#{where} #{why}; which version is meant?", cands)
+    end
+
+    # The lines are the same code at the same numbers on both sides: no hunk touches or shifts them.
+    def same_place?(path, first, last)
+      (first..last).all? { |l| @git.base_line(@base, @head, path, l) == l }
+    end
+
+    # ---------- symbols ----------
+
+    def resolve_constant(name)
+      segs = name.split("::")
+      trekr = head_then_base { |side| ruby_constant(name, side) } if ruby_repo? && @trekr.ok?
+      rq = rq_resolve(name, segs.last, segs[0..-2]) if other_code? && @rq.ok?
+      combine(name, trekr, rq)
+    end
+
+    def resolve_qualified(owner, sep, name)
+      trekr = head_then_base { |side| ruby_method(owner, sep, name, side) } if ruby_repo? && @trekr.ok? && sep != "::"
+      rq = rq_resolve("#{owner}#{sep}#{name}", name, owner.split(/::|\./)) if other_code? && @rq.ok?
+      combine("#{owner}#{sep}#{name}", trekr, rq)
+    end
+
+    # trekr answers for the Ruby, rq for the rest: a name both find is ambiguous,
+    # and an answer without a tool the repo needs is incomplete.
+    def combine(ref, trekr, rq)
+      found = [trekr, rq].compact.reject { |o| o.status == "unresolved" }
+      missing = tools_missing
+      if missing.any?
+        msg = "#{missing.join(" and ")} not found"
+        return unresolved(msg, cause: "tool_missing") if found.empty?
+
+        return ambiguous("#{msg}; this answer may be incomplete", found.flat_map(&:candidates))
+      end
+      return trekr || rq || unresolved("no definition of #{ref}") if found.empty?
+      return found.first if found.size == 1 || found.map { |o| o.chosen&.url }.uniq.size == 1 && found.first.chosen
+
+      ambiguous("#{ref} is defined in Ruby and in another language", found.flat_map(&:candidates))
+    end
+
+    # Head first; base only for code the PR removed. Keeps head's reason on a miss.
+    def head_then_base
+      head = yield(:head)
+      return head unless head.status == "unresolved"
+
+      base = yield(:base)
+      base.status == "unresolved" ? head : base
+    end
+
+    # Constant definitions in the checkout whose full name ends with `name`.
+    def constant_sites(dir, name)
+      segs = name.split("::")
+      rows = @trekr.refs(dir, segs.last).select do |r|
+        r["role"] == "definition" && %w[class module constant].include?(r["kind"]) &&
+          fqn_of(r, segs.last).split("::").last(segs.size) == segs
+      end
+      real = rows.reject { |r| r["path"].end_with?(".rbi") }
+      (real.empty? ? rows : real).map { |r| r.merge("fqn" => fqn_of(r, segs.last)) }
+    end
+
+    def fqn_of(row, last)
+      [*Array(row["nesting"]).reverse, last].join("::")
+    end
+
+    def ruby_constant(name, side)
+      dir = snapshot(side)
+      sites = constant_sites(dir, name)
+      if sites.empty?
+        card = @trekr.card(dir, name)
+        return unresolved("trekr finds no constant #{name}") unless card && card["status"] == "resolved"
+
+        d = card["definition"]&.first
+        url = doc_url(card["fqn"] || name, nil, false, d, dir)
+        return linked(doc_cand(url, card["fqn"] || name)) if url
+
+        return unresolved("#{name} is defined outside the repo", cause: "external", where: site_s(d),
+                                                                  cands: d ? [outside_cand(d, "trekr")] : [])
+      end
+      fqns = sites.map { |s| s["fqn"] }.uniq
+      cands = sites.map { |s| cand(side, s["path"], s["line"], tool: "trekr", owner: s["fqn"]) }
+      return ambiguous("#{name} matches #{fqns.size} constants", cands) if fqns.size > 1
+      return ambiguous("#{fqns.first} is defined in #{sites.size} places", cands) if sites.size > 1
+
+      s = sites.first
+      place(side, s["path"], s["line"], name: name.split("::").last, tool: "trekr", owner: s["fqn"])
+    end
+
+    def ruby_method(owner, sep, name, side)
+      dir = snapshot(side)
+      owners = constant_sites(dir, owner).map { |s| s["fqn"] }.uniq
+      owners = [owner] if owners.empty?
+      defs = []
+      cands = []
+      owners.each do |fqn|
+        card = @trekr.card(dir, "#{fqn}#{sep}#{name}") or next
+        case card["status"]
+        when "resolved" then defs.concat(Array(card["definition"]).map { |d| d.merge("owner" => card["owner"]) })
+        when "ambiguous" then cands.concat(Array(card["definition"]).map { |d| site_cand(side, d, dir, card["owner"]) })
+        end
+      end
+      return ambiguous("#{owner}#{sep}#{name}: trekr is not sure", cands) if cands.any?
+
+      defs.uniq! { |d| [d["root"], d["path"], d["line"]] }
+      return unresolved("trekr finds no #{owner}#{sep}#{name}") if defs.empty?
+      if defs.size > 1
+        return ambiguous("#{owner}#{sep}#{name} matches #{defs.size} definitions", defs.map { |d| site_cand(side, d, dir, d["owner"]) })
+      end
+
+      d = defs.first
+      # The cited separator says which docs anchor: `.` a class method, `#` an instance method.
+      repo_or_doc(d, side, name, d["owner"], sep == ".", dir)
+    end
+
+    def site_cand(side, d, dir, owner)
+      d["root"] == dir ? cand(side, d["path"], d["line"], tool: "trekr", owner: owner) : outside_cand(d, "trekr", owner: owner)
+    end
+
+    def repo_or_doc(d, side, name, owner, singleton, dir)
+      if d["root"] == dir
+        place(side, d["path"], d["line"], name: name, tool: "trekr", owner: owner)
+      elsif (url = doc_url(owner, name, singleton, d, dir))
+        linked(doc_cand(url, "#{owner}#{singleton ? "." : "#"}#{name}"))
+      else
+        unresolved("#{name} is defined outside the repo", cause: "external", where: site_s(d), cands: [outside_cand(d, "trekr", owner: owner)])
+      end
+    end
+
+    def doc_cand(url, what)
+      Candidate.new(url: url, tool: "docs", evidence: "Ruby docs for #{what}")
+    end
+
+    def site_s(d)
+      d ? "#{d["root"] && File.basename(d["root"])}/#{d["path"]}:#{d["line"]}" : "?"
+    end
+
+    # A bare name links only when its spelling marks it as code: `name()`,
+    # `#name`/`.name`, or a spelling no English word has (an underscore, a
+    # `?!=` suffix, an inner capital). A plain word is prose as often as code.
+    def resolve_bare_ref(name, marked)
+      o = resolve_bare(name)
+      return o if marked || name.match?(/_|[?!=]\z|[a-z][A-Z]/)
+
+      case o.status
+      when "linked"
+        ambiguous("`#{name}` is a plain word, which prose uses too; write `#{name}()` or `Owner##{name}` to link it", o.candidates)
+      when "unresolved"
+        o.cause == "not_found" ? left("a plain word, defined in no file this PR touches", o.candidates) : o
+      else o
+      end
+    end
+
+    # A bare method name: a definition in a file the PR touches, else what its
+    # call sites in the diff run.
+    def resolve_bare(name)
+      defs = touched_defs(name)
+      return unresolved("#{tools_missing.join(" and ")} not found", cause: "tool_missing") unless defs
+
+      # A test file defines doubles (a fake thread's `join`): only its test methods count on their own.
+      real = defs.reject { |d| test_file?(d[:path]) && !name.start_with?("test_") }
+      if real.size == 1
+        d = real.first
+        return place(d[:side], d[:path], d[:line], name: name, tool: d[:tool])
+      end
+      return ambiguous("#{name} is defined #{real.size} times in the files this PR touches", def_cands(real)) if real.size > 1
+      return ambiguous("#{name} is defined only in test code the PR touches", def_cands(defs)) if defs.any?
+
+      ruby_repo? ? bare_call_sites(name) : unresolved("no definition of #{name} in the files this PR touches")
+    end
+
+    def def_cands(defs)
+      defs.map { |d| cand(d[:side], d[:path], d[:line], tool: d[:tool]) }
+    end
+
+    # nil when a tool the touched files need is missing.
+    def touched_defs(name)
+      @changed.flat_map do |path, st|
+        side = st == "D" ? :base : :head
+        if path.end_with?(".rb")
+          return nil unless @trekr.ok?
+
+          rows = @trekr.symbols(snapshot(side), path).select { |r| r["kind"] == "method" && r["name"] == name }
+          tool = "trekr"
+        elsif code_ext?(path) && !path.match?(/\.(md|ya?ml|json|toml|lock|txt)\z/)
+          return nil unless @rq.ok?
+
+          rows = @rq.symbols(snapshot(side), path).select { |r| r["name"] == name && %w[method function].include?(r["kind"]) }
+          tool = "rq"
+        else
+          rows = []
+        end
+        rows.map { |r| { side: side, path: path, line: r["line"], tool: tool } }
+      end.uniq
+    end
+
+    def test_file?(path)
+      path.match?(%r{(\A|/)(test|spec)s?/|_(test|spec)\.\w+\z})
+    end
+
+    def bare_call_sites(name)
+      @touched ||= @git.touched_lines(@base, @head)
+      re = /(?<![\w@$:])#{Regexp.escape(name)}(?![\w?!=])/
+      targets = []
+      cands = []
+      seen = 0
+      @touched.each do |path, sides|
+        next unless path.end_with?(".rb")
+
+        sides.each do |side, lns|
+          src = @git.lines(sha(side), path) or next
+          lns.each do |ln|
+            text = src[ln - 1].to_s
+            next if text.lstrip.start_with?("#")
+
+            text.to_enum(:scan, re).each do
+              break if seen >= 12
+
+              seen += 1
+              col = Regexp.last_match.begin(0) + 1
+              dir = snapshot(side)
+              a = @trekr.def_at(dir, path, ln, col)
+              # snapped_to: the column held no name (a string), so trekr answered a neighbor.
+              next unless a && a["under"] == "call" && !a["snapped_to"]
+
+              # Only a resolved receiver counts: a residue's lone candidate is a guess.
+              if a["status"] == "resolved" && Array(a["definition"]).size == 1
+                targets << [a["definition"].first, a["owner"], a["singleton"], side, dir]
+              else
+                cs = Array(a["candidates"]).map do |c|
+                  Candidate.new(tool: "trekr", owner: c["owner"], path: "#{c["owner"]}#{c["singleton"] ? "." : "#"}#{name}")
+                end
+                cs = Array(a["definition"]).map { |d| site_cand(side, d, dir, a["owner"]) } if cs.empty?
+                cands << ["#{path}:#{ln}", cs]
+              end
+            end
+          end
+        end
+      end
+      if cands.any?
+        where, cs = cands.first
+        return ambiguous("trekr does not resolve the call at #{where}", cs)
+      end
+      return unresolved("no definition of #{name} in the files this PR touches, nor a call to it in the diff") if targets.empty?
+
+      keys = targets.uniq { |d, o, s, _| [o, s, d["path"], d["line"]] }
+      if keys.size > 1
+        return ambiguous("#{name}'s call sites in the diff run different methods",
+                         keys.map { |d, o, _s, side, dir| site_cand(side, d, dir, o) })
+      end
+
+      d, owner, singleton, side, dir = targets.first
+      repo_or_doc(d, side, name, owner, singleton, dir)
+    end
+
+    # rq: every language. Exact name, in the scope the ref names (see scope_ok?).
+    # A lowercase owner is a module path: when the qualified query finds nothing
+    # there, look up the bare name and keep the free functions in that module.
+    def rq_resolve(query, name, owner_segs)
+      %i[head base].each do |side|
+        dir = snapshot(side)
+        found, warm = @rq.query(dir, query)
+        rows = rq_matches(found, dir, name, owner_segs)
+        if rows.empty? && owner_segs.any? && owner_segs.all? { |o| o.match?(/\A[a-z_]/) }
+          found, warm2 = @rq.query(dir, name)
+          warm ||= warm2
+          rows = rq_matches(found, dir, name, owner_segs)
+        end
+        cands = rows.flat_map { |r| rq_cands(side, r) }
+        if warm
+          return unresolved("rq's index of #{short(side)} is still warming; rerun", cause: "warming") if rows.empty?
+
+          return ambiguous("rq's index of #{short(side)} is still warming, so this answer may be incomplete; rerun", cands)
+        end
+        next if rows.empty?
+        return ambiguous("rq: #{query} matches #{rows.size} definitions", cands) if rows.size > 1
+
+        r = rows.first
+        if r["declarations"].to_i > 1 || Array(r["also_in"]).any?
+          return ambiguous("rq: #{query} is declared #{[r["declarations"].to_i, cands.size].max} times (trait impls, overloads)", cands)
+        end
+
+        return place(side, r["file"], r["line"], name: name, tool: "rq", owner: r["parent"])
+      end
+      nil
+    end
+
+    def rq_matches(rows, dir, name, owner_segs)
+      rows.select do |r|
+        r["name"] == name && r["root"] == dir && (!ruby_repo? || r["language"] != "ruby") &&
+          scope_ok?(r["parent"].to_s.split(/::|\./), r["file"], owner_segs)
+      end.uniq { |r| [r["file"], r["line"]] }
+    end
+
+    def rq_cands(side, r)
+      also = Array(r["also_in"]).map do |a|
+        path, line = a.split(/:(?=\d+\z)/)
+        cand(side, path, line.to_i, tool: "rq", owner: r["parent"])
+      end
+      [cand(side, r["file"], r["line"], tool: "rq", owner: r["parent"]), *also]
+    end
+
+    # Each owner segment names the definition's enclosing scope. A definition
+    # inside a type answers to that type, so the last segment must be its
+    # parent; a definition with no parent answers to its module, which is its
+    # file's path. (serve::run is the free fn in serve.rs, not Serve::run.)
+    def scope_ok?(chain, file, segs)
+      return true if segs.empty?
+      return segs.all? { |s| path_has?(file, s) } if chain.empty?
+
+      segs.last == chain.last && segs[0...-1].all? { |s| chain.include?(s) || path_has?(file, s) }
+    end
+
+    def path_has?(file, seg)
+      parts = file.sub(/\.\w+\z/, "").split("/")
+      snake = seg.gsub(/([a-z\d])([A-Z])/, '\1_\2').downcase
+      parts.include?(seg) || parts.include?(snake)
+    end
+
+    # ---------- placing a target ----------
+
+    # Verify the line names the definition, move it to base when it is unchanged
+    # there, build the candidate.
+    def place(side, path, line, name:, tool:, owner: nil)
+      src = @git.lines(sha(side), path)
+      return unresolved("#{path} is not at #{short(side)}") unless src
+
+      text = src[line - 1]
+      return unresolved("#{path}:#{line} at #{short(side)} does not mention #{name}") if name && !(text && word?(text, name))
+
+      if side == :head && !@changed.key?(path)
+        side = :base
+      elsif side == :head && (bl = @git.base_line(@base, @head, path, line)) && @git.lines(@base, path)&.[](bl - 1) == text
+        side = :base
+        line = bl
+      end
+      linked(cand(side, path, line, tool: tool, owner: owner))
+    end
+
+    def word?(text, name)
+      text.match?(/(?<![\w@$])#{Regexp.escape(name)}(?![\w])/)
+    end
+
+    def blob_url(side, path, line, end_line = nil)
+      anchor = if end_line then "#L#{line}-L#{end_line}"
+               elsif line then "#L#{line}"
+               end
+      "https://github.com/#{repo(side)}/blob/#{short(side)}/#{url_path(path)}#{anchor}"
+    end
+
+    # Percent-encodes what a URL path or a Markdown link destination cannot hold
+    # (spaces, parentheses, non-ASCII).
+    def url_path(path)
+      path.split("/", -1).map do |seg|
+        seg.gsub(/[^A-Za-z0-9._~!$&'*+,;=:@-]/) { |c| c.bytes.map { |b| format("%%%02X", b) }.join }
+      end.join("/")
+    end
+
+    # ---------- Ruby docs ----------
+
+    def doc_url(owner, name, singleton, site, dir)
+      return unless site && site["root"]
+
+      ruby = @trekr.ruby(dir)
+      core = site["root"].include?("/trekr.core/")
+      stdlib = ruby["root"] && site["root"] == ruby["root"]
+      return unless core || stdlib
+
+      page = "https://docs.ruby-lang.org/en/#{ruby_version(ruby)}/#{owner.gsub("::", "/")}.html"
+      name ? "#{page}#method-#{singleton ? "c" : "i"}-#{aref(name)}" : page
+    end
+
+    # RDoc's anchor encoding: anything but [A-Za-z0-9_] becomes -XX.
+    def aref(name)
+      name.gsub(/[^A-Za-z0-9_]/) { |c| format("-%02X", c.ord) }
+    end
+
+    def ruby_version(ruby)
+      named = @git.lines(@head, ".ruby-version")&.first ||
+              @git.lines(@head, ".tool-versions")&.grep(/\Aruby\s/)&.first&.split&.last
+      v = named&.strip&.delete_prefix("ruby-") || ruby["version"].to_s
+      v.split(".").first(2).join(".")
+    end
+
+    # ---------- existing links ----------
+
+    BLOB = %r{\Ahttps://github\.com/([^/]+/[^/]+)/blob/([^/?#]+)/([^?#]*)(\?[^#]*)?(#.*)?\z}.freeze
+
+    def link_ref(site)
+      m = site.url.match(BLOB) or return
+      repo, rev, path, query, frag = m[1], m[2], m[3], m[4], m[5]
+      path = path.b.gsub(/%(\h\h)/) { Regexp.last_match(1).hex.chr }.force_encoding(Encoding::UTF_8).scrub
+      lines = frag&.match(/\A#L(\d+)(?:C\d+)?(?:-L(\d+)(?:C\d+)?)?\z/)
+      first = lines && lines[1].to_i
+      last = lines && lines[2]&.to_i
+      ref = new_ref(site.start, site.stop, "existing_link")
+      ref.query = site.text
+      ref.url_start = site.url_start
+      ref.url_stop = site.url_stop
+      ref.existing = { "url" => site.url, "repo" => repo, "rev" => rev, "path" => path, "line" => first, "end_line" => last }
+      ref.apply(check_link(site, repo, rev, path, query, frag, first, last))
+    end
+
+    def check_link(site, repo, rev, path, query, frag, first, last)
+      ours = [@base_repo, @head_repo].map(&:downcase).include?(repo.downcase)
+      return left("links #{repo}, not this PR's repo; not checked") unless ours
+      unless rev.match?(/\A[0-9a-f]{7,40}\z/)
+        return existing("existing_unpinned", "pinned to #{rev}, a branch or tag that moves; pin a commit sha")
+      end
+
+      full = @git.rev(rev)
+      return existing("existing_stale", "#{rev} is not in the local clone: force-pushed away, or fetch it") unless full
+
+      src = @git.lines(full, path)
+      return existing("existing_wrong", "no #{path} at #{rev}") unless src
+      if frag && !first
+        return existing("existing_ok", "#{path} exists at #{rev}; the anchor #{frag} is not a line, so not checked") unless frag.start_with?("#L")
+
+        return existing("existing_wrong", "the anchor #{frag} is not a line (#L12) or a range (#L12-L15)")
+      end
+      return existing("existing_ok", "#{path} exists at #{rev}#{" (#{query})" if query}") unless first
+
+      hi = last || first
+      return existing("existing_wrong", "the range #{frag} ends before it starts") if hi < first
+      return existing("existing_wrong", "#{path} has #{src.size} lines at #{rev}") if hi > src.size
+
+      sym = link_symbol(site.text)
+      return existing("existing_ok", "line #{first} exists at #{rev}; the link text is not a name, so only the line is checked") unless sym
+
+      owner, name = sym
+      cited = [*owner, name].join("::")
+      defs = definitions(full, path, name, owner)
+      if defs.nil?
+        if (first..hi).any? { |l| word?(src[l - 1], name) }
+          return existing("existing_ok", "#{name} is on the line at #{rev}; no symbols for #{path}, so its owner is not checked")
+        end
+
+        return existing("existing_wrong", "#{frag} at #{rev} does not mention #{name}")
+      end
+      # A range holding the definition, or lines inside its body (the call it makes), are deliberate.
+      if defs.any? { |f, l| (first..hi).cover?(f) || (f <= first && hi <= l) }
+        return existing("existing_ok", "#{frag} at #{rev} is in #{cited}")
+      end
+
+      cands = defs.map { |f, _| link_cand(site.url, repo, full, path, f, src, tool_for(path)) }
+      if defs.size == 1 && !last
+        fixed = cands.first
+        return existing("existing_wrong", "line #{first} (#{src[first - 1].strip.inspect}) -> #{defs[0][0]} (#{fixed.url})", chosen: fixed)
+      end
+      existing("existing_wrong", "#{frag} at #{rev} is not in #{cited} (#{defs.size} definitions in the file)", cands: cands)
+    end
+
+    def tool_for(path)
+      path.end_with?(".rb") ? "trekr" : "rq"
+    end
+
+    def link_cand(url, repo, full, path, line, src, tool)
+      Candidate.new(url: url.sub(/#.*\z/, "") + "#L#{line}", repo: repo, sha: full, path: path, line: line,
+                    tool: tool, evidence: src[line - 1]&.strip)
+    end
+
+    # [[first_line, last_line], ...] of the file's definitions of `name` in the
+    # cited owner's scope at the sha; nil when no tool can outline the file.
+    def definitions(full, path, name, owner)
+      ruby = path.end_with?(".rb")
+      tool = ruby ? @trekr : @rq
+      return unless tool.ok?
+
+      rows = tool.symbols(snapshot_at(full), path)
+      return if rows.empty?
+
+      rows.select { |r| r["name"] == name && r["line"] }.select do |r|
+        chain = ruby ? Array(r["nesting"]).reverse : r["parent"].to_s.split(/::|\./)
+        scope_ok?(chain, path, owner)
+      end.map { |r| [r["line"], r["end_line"] || r["line"]] }
+    end
+
+    # [owner segments, name] a link's text cites, when it is a code span naming a symbol.
+    def link_symbol(text)
+      t = text.strip
+      return unless (m = t.match(/\A(`+)\s*([^`]+?)\s*\1\z/))
+
+      c = m[2].delete_suffix("()")
+      return if c.match?(/\s/) || path_like?(c)
+
+      if c.match?(CONST)
+        segs = c.delete_prefix("::").split("::")
+        [segs[0..-2], segs.last]
+      elsif (q = c.match(QUALIFIED))
+        [q[1].delete_prefix("::").split(/::|\./), q[3]]
+      elsif (q = c.match(/\A[#.]?(#{IDENT})\z/))
+        [[], q[1]]
+      end
+    end
+
+    # ---------- output ----------
+
+    def rewrite(body, refs)
+      out = body.dup
+      refs.sort_by { |r| -r.start }.each do |r|
+        if r.status == "linked"
+          out[r.start...r.stop] = "[#{r.text}](#{r.chosen.url})"
+        elsif r.status == "existing_wrong" && r.chosen
+          out[r.url_start...r.url_stop] = r.chosen.url
+        end
+      end
+      out
+    end
+  end
+
+  # ---------- report ----------
+
+  module Report
+    module_function
+
+    def summary(refs, tools_missing, warnings, exit_code)
+      counts = Prlink::STATUSES.map { |s| [s, refs.count { |r| r.status == s }] }.to_h
+      { "refs" => refs.size }.merge(counts).merge("tools_missing" => tools_missing, "warnings" => warnings, "exit" => exit_code)
+    end
+
+    def text(io, refs, sides, warnings, explain:)
+      sides.each do |name, s|
+        io.puts "#{name} #{s["short"]} in #{s["repo"]}: #{s["from"]}#{" (not pushed: its links 404 until it is)" unless s["pushed"]}"
+      end
+      if explain
+        refs.each { |r| explain_ref(io, r) }
+      else
+        grouped(io, refs)
+      end
+      warnings.each { |w| io.puts "warning: #{w}" }
+    end
+
+    def grouped(io, refs)
+      by = refs.group_by(&:status)
+      section(io, "linked", by["linked"]) do |rs|
+        rs.group_by { |r| [r.text, r.chosen.url] }.map { |(t, u), g| "#{t} -> #{u}#{" (x#{g.size})" if g.size > 1}" }
+      end
+      fixed, wrong = Array(by["existing_wrong"]).partition(&:chosen)
+      section(io, "fixed existing link", fixed) { |rs| rs.map { |r| "#{r.query}: #{r.reason}" } }
+      section(io, "ambiguous (link by hand)", by["ambiguous"]) { |rs| rs.map { |r| "#{r.text}: #{r.reason}#{cands(r)}" } }
+      Array(by["unresolved"]).group_by(&:cause).sort_by { |c, _| c.to_s }.each do |cause, rs|
+        section(io, "unresolved (#{cause.tr("_", " ")})", rs) do |g|
+          g.map { |r| "#{r.text}: #{r.reason}#{" [#{r.where}]" if r.where}" }.uniq
+        end
+      end
+      section(io, "existing link looks wrong", wrong) { |rs| rs.map { |r| "#{r.text}: #{r.reason}#{cands(r)}" } }
+      section(io, "existing link stale", by["existing_stale"]) { |rs| rs.map { |r| "#{r.text}: #{r.reason}" } }
+      section(io, "existing link unpinned", by["existing_unpinned"]) { |rs| rs.map { |r| "#{r.text}: #{r.reason}" } }
+      ok = Array(by["existing_ok"])
+      io.puts "existing links verified: #{ok.size}" if ok.any?
+      left = Array(by["left_alone"]).group_by(&:reason)
+      left.each { |reason, rs| io.puts "left alone (#{reason}): #{rs.map(&:text).uniq.join(" ")}" }
+    end
+
+    def section(io, title, refs)
+      return if refs.nil? || refs.empty?
+
+      io.puts "#{title}:"
+      yield(refs).each { |l| io.puts "  #{l}" }
+    end
+
+    def cands(ref)
+      c = ref.candidates.map { |x| cand_s(x) }.uniq
+      more = c.size > 10 ? "\n      (+#{c.size - 10} more)" : ""
+      c.any? ? "\n      #{c.first(10).join("\n      ")}#{more}" : ""
+    end
+
+    def cand_s(c)
+      where = c.url || c.path
+      c.evidence && c.tool != "docs" ? "#{where}  #{c.evidence.inspect}" : where.to_s
+    end
+
+    def explain_ref(io, r)
+      io.puts "#{r.text} (line #{r.line}, col #{r.col}): #{r.shape}, #{r.status}#{" (#{r.cause})" if r.cause}"
+      io.puts "  reason: #{r.reason}" if r.reason
+      io.puts "  where: #{r.where}" if r.where
+      r.candidates.each do |c|
+        mark = r.chosen && c.url == r.chosen.url ? "*" : "-"
+        io.puts "  #{mark} #{[c.tool, c.side, c.owner, c.url || c.path].compact.join(" ")}"
+        io.puts "      #{c.evidence.inspect}" if c.evidence
+      end
+    end
+  end
+
+  # ---------- CLI ----------
+
+  module CLI
+    module_function
+
+    HELP = <<~HELP
+      usage: prlink [SOURCE] [options]
+
+      Find the code references in a PR description (backticked paths, constants,
+      Owner#method / Owner.method / Mod::fn names, bare method names, path:line
+      tokens, and existing GitHub links), resolve each with trekr (Ruby) or rq
+      (everything else), and link it to a permalink pinned at a commit sha.
+
+      Source (one of; the current directory is the repo unless -C):
+        --body FILE       a draft body; `-` (or a pipe, with no source) reads stdin
+        --pr N            an open PR's body and shas, via `gh pr view`
+        --pr-json FILE    the same from a saved `gh pr view --json body,baseRefOid,headRefOid,headRepository`
+
+      Options:
+        -C DIR            the local clone (any directory in it); default: the current directory
+        --repo REPO       the base repo as OWNER/NAME; default: origin's GitHub repo
+        --base REV        (--body) the base: any rev, e.g. origin/main, v1.2, HEAD~3;
+                          default: origin/HEAD. Links go to merge-base(REV, head).
+        --head REV        (--body) the head commit; default HEAD
+        -j, --json        report every ref as one JSON document; changes nothing
+        -J, --ndjson      the same, one ref per line, then a summary line
+        --explain         the text report shows every ref: shape, candidates, evidence
+        --write           save the linked body back to FILE (--body), or `gh pr edit` (--pr)
+        --allow-unpushed  let --write save links to a head commit no remote has
+        -h, --help        this help
+
+      Base and head: a line unchanged since the base is linked at the base sha
+      (stable); new or changed code at the head sha, in the head repo (the fork).
+
+      Output: the body, with links applied, on stdout; the report on stderr. With
+      --json/--ndjson, the refs on stdout instead. --write prints the body too.
+
+      Each ref's status: linked, ambiguous (several candidates, or a plain word),
+      unresolved (external: a dependency, core or stdlib; not_found; tool_missing;
+      warming), left_alone (with why), existing_ok, existing_wrong (a fix when it is
+      sure), existing_stale (sha not in the clone), existing_unpinned (a branch link).
+
+      Exit codes:
+        0  every ref linked, verified or left alone on purpose
+        1  refs to review (ambiguous, unresolved, wrong/stale/unpinned links), or
+           links to a commit no remote has
+        2  usage or operational error (bad flag, not a git checkout, body not UTF-8)
+
+      Examples:
+        prlink --body /tmp/pr-feature.md
+        prlink --body pr.md --base origin/release --json
+        prlink --pr 42 --repo acme/widget --ndjson
+        prlink --pr 42 --write
+        prlink -C ~/code/widget --body pr.md --base HEAD~1 --explain
+
+      Env: PRLINK_TREKR, PRLINK_RQ (the binaries), PRLINK_CACHE (snapshot clones,
+      default ~/.cache/prlink).
+    HELP
+
+    def parse(argv)
+      opts = {}
+      parser = OptionParser.new do |o|
+        o.on("--repo REPO") { |v| opts[:repo] = v }
+        o.on("--pr N", Integer) { |v| opts[:pr] = v }
+        o.on("--pr-json FILE") { |v| opts[:pr_json] = v }
+        o.on("--body FILE") { |v| opts[:body] = v }
+        o.on("--base REV") { |v| opts[:base] = v }
+        o.on("--head REV") { |v| opts[:head] = v }
+        o.on("-C DIR") { |v| opts[:dir] = File.expand_path(v) }
+        o.on("--write") { opts[:write] = true }
+        o.on("--allow-unpushed") { opts[:allow_unpushed] = true }
+        o.on("-j", "--json") { opts[:format] = :json }
+        o.on("-J", "--ndjson") { opts[:format] = :ndjson }
+        o.on("--explain") { opts[:explain] = true }
+        o.on("-h", "--help") { opts[:help] = true }
+      end
+      parser.parse!(argv)
+      raise UsageError, "unexpected argument #{argv.first}; see --help" if argv.any?
+
+      opts
+    end
+
+    def gh_json(repo, pr)
+      fields = "body,baseRefName,headRefName,headRepository,headRepositoryOwner,baseRefOid,headRefOid"
+      out, err, st = Open3.capture3("gh", "pr", "view", pr.to_s, *(["-R", repo] if repo), "--json", fields)
+      raise UsageError, "gh pr view #{pr}: #{err.strip}" unless st.success?
+
+      JSON.parse(out)
+    rescue SystemCallError => e
+      raise UsageError, "gh pr view #{pr}: #{e.message}"
+    end
+
+    def remote_repo(git, remote)
+      url = git.run("remote", "get-url", remote)&.strip or return
+      url[%r{github\.com[:/]([^/]+/[^/]+?)(?:\.git)?/?\z}, 1]
+    end
+
+    # The repo of a remote branch holding the head commit: the branch's upstream
+    # when it holds it, else the only remote that does, else origin.
+    def head_remote_repo(git, head)
+      remotes = git.run("branch", "-r", "--contains", head).to_s.lines
+                   .map { |l| l.strip.split("/").first }.reject { |r| r.include?("->") }.uniq
+      upstream = git.run("rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}")&.strip&.split("/")&.first
+      pick = remotes.include?(upstream) ? upstream : (remotes.size == 1 ? remotes.first : ("origin" if remotes.include?("origin")))
+      pick && remote_repo(git, pick)
+    end
+
+    def read_body(source, stdin)
+      raw = source == "-" ? stdin.read : File.binread(source)
+      body = raw.dup.force_encoding(Encoding::UTF_8)
+      unless body.valid_encoding?
+        at = 0
+        body.each_char do |ch|
+          break unless ch.valid_encoding?
+
+          at += ch.bytesize
+        end
+        raise UsageError, "#{source == "-" ? "stdin" : source} is not valid UTF-8 (first bad byte at offset #{at}); save it as UTF-8"
+      end
+      body
+    rescue SystemCallError => e
+      raise UsageError, e.message
+    end
+
+    def shallow_hint(git)
+      git.shallow? ? " This is a shallow clone: `git fetch --deepen=200` (or `git fetch --unshallow`) and retry." : ""
+    end
+
+    def main(argv, stdin: $stdin, stdout: $stdout, stderr: $stderr)
+      opts = parse(argv)
+      if opts[:help]
+        stdout.write(HELP)
+        return 0
+      end
+      opts[:body] = "-" if %i[pr pr_json body].none? { |k| opts[k] } && !stdin.tty?
+      sources = %i[pr pr_json body].count { |k| opts[k] }
+      if sources != 1
+        stderr.write(HELP) if sources.zero?
+        raise UsageError, "usage: prlink [SOURCE] [options]: give exactly one of --body, --pr, --pr-json (see --help)"
+      end
+      raise UsageError, "--write takes --pr or --body FILE" if opts[:write] && (opts[:pr_json] || opts[:body] == "-")
+      raise UsageError, "--json and --ndjson only report; drop --write" if opts[:write] && opts[:format]
+      raise UsageError, "--base and --head go with --body" if (opts[:base] || opts[:head]) && !opts[:body]
+
+      dir = opts[:dir] || Dir.pwd
+      raise UsageError, "no directory #{dir}" unless File.directory?(dir)
+
+      top = Git.new(dir).toplevel or raise UsageError, "#{dir} is not in a git checkout"
+      git = Git.new(top)
+      base_repo = opts[:repo] || remote_repo(git, "origin")
+      raise UsageError, "no --repo, and origin is not a GitHub remote" unless base_repo
+
+      warnings = []
+      if opts[:body]
+        body = read_body(opts[:body], stdin)
+        head_from = opts[:head] || "HEAD"
+        head = git.rev(head_from) or raise UsageError, "no commit #{head_from}.#{shallow_hint(git)}"
+        base_ref = opts[:base] || git.run("symbolic-ref", "--short", "refs/remotes/origin/HEAD")&.strip || "main"
+        base_tip = git.rev(base_ref) or raise UsageError, "no commit #{base_ref}; pass --base.#{shallow_hint(git)}"
+        head_repo = head_remote_repo(git, head) || base_repo
+        base_from = "merge-base of #{base_ref} and #{head_from}"
+      else
+        meta = opts[:pr] ? gh_json(base_repo, opts[:pr]) : JSON.parse(read_body(opts[:pr_json], stdin))
+        body = meta["body"].to_s
+        head = git.rev(meta["headRefOid"]) or
+          raise UsageError, "head #{meta["headRefOid"].to_s[0, 7]} is not in #{top}; fetch the PR branch first"
+        base_tip = git.rev(meta["baseRefOid"]) or raise UsageError, "base #{meta["baseRefOid"].to_s[0, 7]} is not in #{top}; fetch first"
+        head_repo = meta.dig("headRepository", "nameWithOwner") ||
+                    [meta.dig("headRepositoryOwner", "login"), meta.dig("headRepository", "name")].compact.join("/")
+        head_repo = base_repo if head_repo.to_s.empty? || !head_repo.include?("/")
+        head_from = "the PR's head"
+        base_from = "merge-base of the PR's base and head"
+      end
+      base = git.run("merge-base", base_tip, head)&.strip or
+        raise UsageError, "no merge-base of #{base_tip[0, 7]} and #{head[0, 7]}.#{shallow_hint(git)}"
+      warnings << "shallow clone: the merge-base may be wrong; `git fetch --deepen=200` (or `--unshallow`) to be sure" if git.shallow?
+      warnings << "base and head are the same commit (#{git.short(head)}): nothing to compare; pass --base" if base == head
+
+      bom = body.start_with?("﻿") ? "﻿" : ""
+      body = body.delete_prefix(bom)
+      linker = Linker.new(
+        git: git, base_repo: base_repo, head_repo: head_repo, base: base, head: head,
+        trekr: Trekr.new(ENV.fetch("PRLINK_TREKR", "trekr")),
+        rq: Rq.new(ENV.fetch("PRLINK_RQ", "rq")),
+        cache: ENV.fetch("PRLINK_CACHE", File.expand_path("~/.cache/prlink"))
+      )
+      refs = linker.analyze(body)
+      out = bom + linker.rewrite(body, refs)
+
+      # A PR's shas come from GitHub, so they are pushed by definition.
+      pushed = ->(s) { !opts[:body] || git.pushed?(s) }
+      sides = {
+        "base" => { "sha" => base, "short" => git.short(base), "repo" => base_repo, "from" => base_from, "pushed" => pushed.call(base) },
+        "head" => { "sha" => head, "short" => git.short(head), "repo" => head_repo, "from" => head_from, "pushed" => pushed.call(head) }
+      }
+      missing = linker.tools_missing
+      warnings.concat(missing.map { |t| "#{t} not found: refs that need it are unresolved (PRLINK_TREKR, PRLINK_RQ name the binaries)" })
+      code = refs.any? { |r| REVIEW.include?(r.status) } || sides.values.any? { |s| !s["pushed"] } ? 1 : 0
+      summary = Report.summary(refs, missing, warnings, code)
+
+      case opts[:format]
+      when :json
+        stdout.puts JSON.pretty_generate(sides.merge("head_pushed" => sides["head"]["pushed"], "refs" => refs.map(&:as_json), "summary" => summary))
+      when :ndjson
+        refs.each { |r| stdout.puts JSON.generate(r.as_json) }
+        stdout.puts JSON.generate(sides.merge("head_pushed" => sides["head"]["pushed"], "summary" => summary))
+      else
+        stdout.write(out)
+        Report.text(stderr, refs, sides, warnings, explain: opts[:explain])
+        if opts[:write] && out != bom + body
+          if !sides["head"]["pushed"] && !opts[:allow_unpushed]
+            stderr.puts "not written: head #{sides["head"]["short"]} is on no remote (push it, or --allow-unpushed)"
+          else
+            write_back(opts, base_repo, out, stderr)
+          end
+        end
+      end
+      code
+    rescue UsageError, OptionParser::ParseError, JSON::ParserError => e
+      stderr.puts "prlink: #{e.message}"
+      2
+    rescue StandardError => e
+      raise if ENV["PRLINK_DEBUG"]
+
+      stderr.puts "prlink: internal error: #{e.class}: #{e.message} (PRLINK_DEBUG=1 shows the trace)"
+      2
+    end
+
+    def write_back(opts, repo, out, stderr)
+      if opts[:body]
+        File.write(opts[:body], out)
+      else
+        path = File.join(Dir.tmpdir, "prlink-#{opts[:pr]}.md")
+        File.write(path, out)
+        system("gh", "pr", "edit", opts[:pr].to_s, "-R", repo, "--body-file", path, exception: true)
+      end
+      stderr.puts "wrote #{opts[:body] || "PR ##{opts[:pr]}"}"
+    end
+  end
+end
+
+exit Prlink::CLI.main(ARGV) if $PROGRAM_NAME == __FILE__

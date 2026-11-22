@@ -1,0 +1,437 @@
+# Every link prlink makes differently from the hand-linked original, misses,
+# or adds, with why. The test fails on any link not listed here. `wrong` lists
+# the links prlink gets wrong today (known failures, for its fix lane). Each
+# case's repo is cloned, and its `pr` fetched, into $TMPDIR/prlink-gold.
+#
+# A bare name that is a plain word (`close`, `pluck`) is reported ambiguous with
+# its candidate instead of linked, since prose uses those words too; before that
+# rule, 18 of the 19 plain-word links here were right, and all 69 identifier-
+# spelled ones (`detect_column`, `uuid?`).
+cases:
+  spoom-1052:
+    repo: Shopify/spoom
+    pr: 1052
+    exit: 1
+    different:
+      "`client_framing_test.rb`": 'names the file, so links the file; the original pinned the new test method''s line'
+    missed:
+      lsp.rb#L31: 'reported ambiguous; line 31 differs between base and head, and the text cannot say which version it means'
+      "`puts`": 'reported with IO#puts among the candidates; trekr leaves `@in.puts` a residue because `@in` is typed only by an RBS-inline `#: IO` comment'
+      "`bytesize`": 'reported with String#bytesize as the lone candidate; trekr leaves it a residue because `json_string` is typed only by a `#: (String json_string)` comment'
+      LSP spec: prose linked to an external spec, not a code reference
+  spoom-1053:
+    repo: Shopify/spoom
+    pr: 1053
+    exit: 1
+    different:
+      "`client_notifications_test.rb`": 'names the file, so links the file; the original pinned the new test method''s line'
+    missed:
+      lsp.rb#L37: 'reported ambiguous; line 37 differs between base and head'
+      "`hover`": 'reported ambiguous with Client#hover as the lone candidate: a plain word, which prose uses too, so prlink asks rather than links'
+      "`read`": 'reported ambiguous with Client#read as the lone candidate: a plain word, which prose uses too, so prlink asks rather than links'
+  spoom-1054:
+    repo: Shopify/spoom
+    pr: 1054
+    exit: 1
+    different:
+      "`client_shutdown_test.rb`": 'names the file, so links the file; the original pinned the new test method''s line'
+      "`rbi/spoom.rbi`": 'names the file, so links the file; the original pinned the regenerated sig''s line'
+    missed:
+      lsp.rb#L228: 'reported ambiguous; line 228 differs between base and head'
+      base.rb#L42: 'reported ambiguous; line 42 differs between base and head (the original meant head)'
+      "`close`": 'reported ambiguous with Client#close as the lone candidate: a plain word, which prose uses too, so prlink asks rather than links'
+      LSP spec: prose linked to an external spec, not a code reference
+  sorbet-deadcode-173:
+    repo: corsonknowles/sorbet-deadcode
+    pr: 173
+    exit: 1
+  sorbet-deadcode-174:
+    repo: corsonknowles/sorbet-deadcode
+    pr: 174
+    exit: 1
+    different:
+      "`Client#start_server`": 'the method''s def line; the original pinned the popen3 call one line below, which the prose describes'
+    missed:
+      "`shutdown`": 'reported ambiguous with Client#shutdown as the lone candidate: a plain word, which prose uses too, so prlink asks rather than links'
+    extra:
+      "`Open3.popen3`": 'stdlib, resolved by trekr; docs for the checkout''s Ruby (3.4, no .ruby-version)'
+      "`NoMethodError`": 'core class, resolved by trekr'
+      "`test_initialize_spawns_server_and_handshakes`": 'the test method, defined in a file the PR touches, def line unchanged so at base'
+  sorbet-deadcode-175:
+    repo: corsonknowles/sorbet-deadcode
+    pr: 175
+    exit: 1
+    different:
+      "`HybridFinder`": 'the class''s definition; the original pinned the `def` pattern line inside it, which the prose describes'
+    missed:
+      "`detect_column`": 'reported ambiguous; both finders the PR touches define it, and only the next sentence implies DeadCodeFinder''s'
+    extra:
+      "`dead_code_finder_spec.rb`": 'the spec file the PR changes, at head'
+      "`hybrid_finder_spec.rb`": 'the spec file the PR changes, at head'
+
+  # dpep's own PRs, linked by hand. Shorthand used below:
+  #   prose: the link text is prose, not a code span; prlink links only code spans and paths.
+  #   not code: a link to a PR, a run or a web page, not a code permalink.
+  #   at base: the same definition, linked at base because its line is unchanged there.
+  #   at head: the same line, at the PR's head; the original pinned an earlier commit
+  #     of the branch, or one force-pushed away.
+  polyid-63:
+    repo: dpep/polyid
+    pr: 63
+    exit: 1
+    different:
+      "`PolyId.reset`": at base
+    missed:
+      after commit: prose
+      deferred to its commit: prose
+      non-joinable: prose
+      runs commit callbacks for a transaction nested in a non-joinable one: prose, and gem source (rails/rails at v8.1.4)
+      stored lowercase: prose
+      classified by shape: prose
+      treated as misses: prose
+      guarded: prose
+      left alone: prose
+      Translates: prose
+      "`find`": 'reported ambiguous: Model.find and Relation#find, both in files the PR touches; the original pinned polyid_translate_find_args, the helper both call'
+      Saving: prose
+    extra:
+      "`Set`": core class, resolved by trekr; docs for Ruby 3.4
+      "`is_uuid?`": the alias line in lib/polyid.rb, which the PR adds
+      "`uuid?`": PolyId.uuid?, at head
+      "`find_by`": the Model override, at base
+  polyid-66:
+    repo: dpep/polyid
+    pr: 66
+    exit: 1
+    missed:
+      translated: prose
+      read as "no translation": prose
+      left alone: prose
+      sanitize params first: prose
+      "`find_or_create_by` family": 'the link text is more than the code span; prlink links the span alone, to the same line (see extra)'
+      eviction: prose
+      flattens: prose
+      caches: prose
+    extra:
+      "`find_by`": the Model override, at base (both mentions)
+      "`find_or_create_by`": Relation#find_or_create_by at head, the line the original's "`find_or_create_by` family" link pinned (both mentions)
+      "`Relation#find`": at base
+      "`uuids_for`": at base
+  polyid-72:
+    repo: dpep/polyid
+    pr: 72
+    exit: 1
+    different:
+      "`polyid_after_commit`": 'its def line, inside the comment-plus-def range the original pinned'
+    missed:
+      eviction: prose
+      "`after_destroy`": 'reported unresolved: defined in activerecord; the original pinned the call site in model.rb that registers the callback'
+    extra:
+      "`polyid_after_commit`": its second mention, the same def
+  polyid-79:
+    repo: dpep/polyid
+    pr: 79
+    exit: 1
+    missed:
+      validation and canonicalise callbacks: prose
+      the uuid isn't loaded: prose
+      Eviction: prose
+  polyid-90:
+    repo: dpep/polyid
+    pr: 90
+    exit: 1
+    different:
+      "`polyid_uuid_like?`": 'its def line, at base; the original pinned the changed body lines at a commit force-pushed away'
+      "`PolyId.uuid?`": 'its def line, at base; the original pinned the changed body line at a commit force-pushed away'
+    extra:
+      "`ArgumentError`": core class, resolved by trekr
+  rspec-networking-22:
+    repo: dpep/rspec-networking
+    pr: 22
+    exit: 0
+    different:
+      "`texas_instruments.txt`": 'names the file, so links the file at head; the original pinned line 1 at an older main'
+      "`script/update_manufacturers`": names the file, so links the file; the original pinned the MANUFACTURERS table
+    missed:
+      "`2248`": a bare number, left alone; the original pinned the OUI's line in microsoft.txt
+      Xerox `000000` entry: prose
+      IEEE OUI registry: not code
+      MA-L assignments: prose
+      spec: prose
+    extra:
+      "`apple.txt`": a data file the PR regenerates, at head
+      "`zyxel.txt`": a data file the PR regenerates, at head
+  rspec-networking-23:
+    repo: dpep/rspec-networking
+    pr: 23
+    exit: 1
+    different:
+      "`be_a_mac_address`": 'the matcher''s `define` line at base; the original linked the whole file'
+      "`EUI48`": at head, same line; the original pinned an earlier commit of the branch
+      "`HALF`": at head, same line; the original pinned an earlier commit of the branch
+    missed:
+      "`MMM.MMM.SSS.SSS` form": a format, not a name, left alone; the original pinned the regex at an older main
+      "`.from`": 'reported ambiguous: a bare method whose call in the diff trekr does not resolve; it is an RSpec `chain :from`'
+      a second time: prose
+      "`description`": 'reported ambiguous: trekr does not resolve the RSpec DSL `description do` block'
+      "`a_mac_address` alias": 'the link text is more than the code span; prlink links the span alone, to the same line (see extra)'
+    extra:
+      "`NoMethodError`": core class, resolved by trekr
+      "`ArgumentError`": core class, resolved by trekr
+      "`a_mac_address`": the alias_matcher line at head, the line the original's "`a_mac_address` alias" link pinned
+  rspec-networking-24:
+    repo: dpep/rspec-networking
+    pr: 24
+    exit: 1
+    different:
+      "`be_an_ip_address`": 'the matcher''s `define` line at base; the original linked the whole file'
+      "`IPAddr#prefix`": 'stdlib docs; the original pinned the ipaddr gem''s source at v1.2.8'
+    missed:
+      non-host prefix: prose
+      rescues `IPAddr::Error`: 'the link text is more than the code span; prlink links the span alone, to the class''s docs (see extra); the original pinned the rescue'
+      "`InvalidAddressError` and `AddressFamilyError`": 'reported unresolved (trekr finds neither constant); the original pinned their definitions in the ipaddr gem'
+      only the first: prose
+      "`description`": 'reported ambiguous: trekr does not resolve the RSpec DSL `description do` block'
+      "`\"an IPv4 localhost \"`": a string literal, left alone; the original pinned the line that builds it
+    extra:
+      "`IPAddr::Error`": stdlib class docs
+      "`IPAddr.new`": 'stdlib docs, #method-c-new: the cited `.` makes it a class method'
+  inkling-16:
+    repo: dpep/inkling
+    pr: 16
+    exit: 0
+    different:
+      "`push::worth_a_turn`": at base
+    missed:
+      "#14": not code
+      test: prose
+      docs/watching.md, "Your own actions": prose, and a heading anchor
+      Claude Code: not code
+  inkling-18:
+    repo: dpep/inkling
+    pr: 18
+    exit: 1
+    different:
+      "`ensure_serving`": 'its def line, at base; the original pinned the doorbell ring inside it, which the prose describes'
+    missed:
+      rings it: prose
+      watching.md, "How often a watch is read": prose, and a heading anchor
+      docs/deferred.md: 'a path, but not a code span, and the original linked a heading anchor'
+      Claude Code: not code
+    extra:
+      "`Beat`": the struct, at head
+      "`three_quiet_days_cost_under_two_hundred_reads_not_four_thousand`": the test, at head
+  inkling-21:
+    repo: dpep/inkling
+    pr: 21
+    exit: 1
+    different:
+      "`serve::run`": 'the free fn at base (serve.rs:632; 649 at head): a lowercase owner is a module, so Serve::run does not qualify'
+    missed:
+      "#18": not code
+      "`inkling serve --ring`": a command line, left alone; the original pinned its match arm in main.rs
+      Makefile: prose
+      watching.md, "A new build takes over": prose
+      Claude Code: not code
+    extra:
+      "`Exit::Replaced`": the variant, at base
+      "`Exit::MaxLifetime`": the variant, at base
+      "`Replaced`": the same variant, at base
+      "`MaxLifetime`": the same variant, at base
+      "`spawn_detached`": at head, new in the PR
+      "`ensure_running`": at base (both mentions)
+      "`ensure_serving`": at base
+      "`docs/dogfood.md`": the doc the PR changes, at head
+  inkling-22:
+    repo: dpep/inkling
+    pr: 22
+    exit: 1
+    missed:
+      landed: prose
+      dpep/inkling-ci-probe: not code
+      Claude Code: not code
+  inkling-26:
+    repo: dpep/inkling
+    pr: 26
+    exit: 1
+    different:
+      "`push.rs`": 'the file at base: the PR does not change it'
+      "`Response::ignore`": at head, same line; the original pinned an earlier commit of the branch
+      "`GitHubProvider::from_config`": at head, same line; the original pinned an earlier commit of the branch
+      "`docs/dogfood.md`": at head; the original pinned an earlier commit of the branch
+    missed:
+      buildkite/agent#4460: not code
+      buildkite/agent#4458: not code
+      "`identity`": 'reported ambiguous with the fn as the lone candidate: a plain word'
+      "`running`": 'reported ambiguous with the fn as the lone candidate: a plain word'
+      "`interpret`": 'reported ambiguous with the fn as the lone candidate: a plain word'
+      "`arguments`": 'reported ambiguous with the fn as the lone candidate: a plain word'
+    extra:
+      "`RefError::Other`": the variant, at base
+  contour-5:
+    repo: dpep/contour
+    pr: 5
+    exit: 1
+    different:
+      "`Session::request`": 'its def line, at base; the original pins dedfc66, force-pushed away and now a 404'
+      "`Session::reply`": its def line, inside the range the original pinned
+    missed:
+      run 35385316982: not code
+      restats the binary after **every** line: prose (and the original's dedfc66 is a 404)
+      "`serve` says so itself": prose around a code span; `serve` alone is left alone (the original's dedfc66 is a 404)
+      Claude Code: not code
+  gqls-19:
+    repo: dpep/gqls
+    pr: 19
+    exit: 1
+    missed:
+      '"On a schema where every name starts the same way, name the type."': prose (a quote)
+      "`described_by`": 'reported unresolved (not_found): a bare name outside the files the PR touches, in a repo with no Ruby. The original''s line 290 is stale too: the doc comment of DESCRIPTION_WORD; described_by is at 297'
+      DP subsequence aligner: prose
+      "`typo_distance`": 'reported unresolved (not_found): a bare name outside the files the PR touches, in a repo with no Ruby'
+      Claude Code: not code
+    extra:
+      "`script/eval.sh`": its second mention (the original linked the first)
+      "`script/check.sh`": the file, at base
+  gqls-25:
+    repo: dpep/gqls
+    pr: 25
+    exit: 1
+    different:
+      "`claude/gqls-skill.md`": 'names the file, so links the file at head (the PR edits it); the original pinned the base line the PR removes'
+    missed:
+      README.md: prose (not a code span)
+      "#17": not code
+      "#21": not code
+      "#20": not code
+      "#22": not code
+      "#24": not code
+    extra:
+      "`CHANGELOG.md`": the file, at head
+      "`script/eval.sh`": the file, at base
+      "`script/check.sh`": the file, at base
+  py_ambiguous-2:
+    repo: dpep/py_ambiguous
+    pr: 2
+    exit: 1
+    missed:
+      excluded: prose
+      "`inspect.signature`": 'reported unresolved: Python stdlib; the original pinned the call site'
+      "`collect`": 'reported ambiguous with the decorator fn as the lone candidate: a plain word'
+      raises `TypeError`: prose around a code span; `TypeError` is reported unresolved (Python builtin)
+    extra:
+      "`CHANGES.txt`": the file, at head
+      "`A`": the test's class A, at head
+      "`thing_or_things`": the decorator, at base
+      "`test_return_type`": the test, at base
+      "`ambiguous()`": the same function, at base
+      "`.gitignore`": the file, at head
+  py_ambiguous-4:
+    repo: dpep/py_ambiguous
+    pr: 4
+    exit: 1
+    different:
+      "`_AmbiguousMethod.__get__`": '__get__''s def line at head; the original pinned the class line, at a commit force-pushed away'
+      "`ambiguous_classmethod`": at head, same line; the original pinned a commit force-pushed away
+      "`ambiguous_class`": at head, same line; the original pinned a commit force-pushed away
+      "`test_falsy_instance`": at head, same line; the original pinned a commit force-pushed away
+      "`test_subclass_classmethod`": at head, same line; the original pinned a commit force-pushed away
+      "`_AmbiguousDescriptor`": at head, same line; the original pinned a commit force-pushed away
+    extra:
+      "`ambiguous.py`": the file, at head
+      "`Empty()`": the test's class Empty, at head
+      "`A`": the test's class A, at head (both mentions)
+      "`ambiguous_class`": its second mention, the same def
+      "`AmbiguousType`": the class, at base
+  py_ambiguous-15:
+    repo: dpep/py_ambiguous
+    pr: 15
+    exit: 1
+    different:
+      "`__set_name__`": at head; the original pinned a commit force-pushed away, where it sat a line higher
+      "`test_class_introspection`": at head, same line; the original pinned a commit force-pushed away
+      "`test_class_attribute_no_rebinding`": at head, same line; the original pinned a commit force-pushed away
+      "`test_signature`": at head, same line; the original pinned a commit force-pushed away
+      "`_AmbiguousMethod`": 'the class at head (line 73); the original pinned a commit force-pushed away, where it sat at line 51'
+    missed:
+      plain, unbound functions: prose
+    extra:
+      "`ambiguous_class`": at base
+      "`__set_name__`": its later mentions, the same def
+  py_ambiguous-29:
+    repo: dpep/py_ambiguous
+    pr: 29
+    exit: 0
+    missed:
+      Candidates now skip `self` / `cls`: prose
+      now counts as many things: prose
+      now checked before the call: prose
+      now listed in the order of the input and the result: prose
+      rejected at decoration time: prose
+      "`test_methods`, `test_method_hint`, `test_async`": 'one link over three code spans; prlink links each span to its own test (see extra)'
+      frozensets: prose
+      "`test_unhashable_thing` and `test_key_order`": 'one link over two code spans; prlink links each span to its own test (see extra)'
+    extra:
+      "`thing_or_things`": the decorator, at base
+      "`test_methods`": at head, new in the PR
+      "`test_method_hint`": at base, its def line unchanged
+      "`test_async`": at head, new in the PR
+      "`test_unhashable_thing`": at head, new in the PR
+      "`test_key_order`": at head, new in the PR
+  py_pluckit-3:
+    repo: dpep/py_pluckit
+    pr: 3
+    exit: 1
+    missed:
+      "`pluck`": 'reported ambiguous with pluck''s def as the lone candidate: a plain word'
+      wildcard: prose
+      "`inspect.isroutine`": 'reported unresolved: Python stdlib; the original pinned the call site'
+      "`pluck` validates up front": 'the link text is more than the code span; `pluck` alone is a plain word, reported ambiguous with its def'
+      skips types it didn't install: prose
+    extra:
+      "`_walk`": its second mention, the same def
+      "`native.uninstall`": at base
+      "`native.py`": the file, at head
+  py_pluckit-11:
+    repo: dpep/py_pluckit
+    pr: 11
+    exit: 1 # `pluck`, a plain word, is reported ambiguous
+    different:
+      "`parse_path`": at head, same line; the original pinned an earlier commit of the branch
+      "`_walk`": at head, same line; the original pinned an earlier commit of the branch
+    missed:
+      "`pluck` validates up front": 'the link text is more than the code span; `pluck` alone is a plain word, reported ambiguous with its def'
+  pytest-autofixture-3:
+    repo: dpep/pytest-autofixture
+    pr: 3
+    exit: 1
+    different:
+      "`pytest_fixture_setup`": at head, same line; the original pinned an earlier commit of the branch
+      "`pytest_runtest_call`": at head, same line; the original pinned an earlier commit of the branch
+      "`_swap`": at head, same line; the original pinned an earlier commit of the branch
+      "`tests/test_isolated.py`": at head; the original pinned an earlier commit of the branch
+      "`__missing__`": 'its def line, at base; the original pinned a line inside it'
+    missed:
+      "`resolve_fixture_function`": 'reported unresolved (not_found): defined in pytest, which rq does not index; the original pinned pytest 9.1.1''s source'
+      test: prose
+  pytest-autofixture-7:
+    repo: dpep/pytest-autofixture
+    pr: 7
+    exit: 1
+    different:
+      "`_swap`": at base
+    missed:
+      Regression test: prose
+    extra:
+      "`__getitem__`": _LiveGlobals.__getitem__, at head (both mentions)
+      "`write_back()`": _LiveGlobals.write_back, at head
+  pytest-autofixture-27:
+    repo: dpep/pytest-autofixture
+    pr: 27
+    exit: 1
+    different:
+      "`pytest_runtest_call`": 'its def line, at base; the original pinned the changed line inside it'
+      "`test_parametrize_shadows_builtins`": 'its def line, at base; the original pinned the fixture-plus-test range at head'
+      "`_LiveGlobals`": 'the class line, at base; the original pinned its __init__ at head'
+    missed:
+      "#19": not code

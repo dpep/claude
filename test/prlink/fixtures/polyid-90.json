@@ -1,0 +1,18 @@
+{
+  "baseRefName": "main",
+  "baseRefOid": "5fb38a8274ea813a10743616ff7f2c06e6bf23ae",
+  "body": "[`polyid_uuid_like?`](https://github.com/dpep/polyid/blob/93733fc/lib/polyid/model.rb#L196-L197) stripped every value before matching, and `strip` raises on invalid bytes. So `where(name: \"\\xFF abc\")` raised `ArgumentError` on every model. Rails usually rejects such params earlier, but imports and other inputs can carry them. It, and [`PolyId.uuid?`](https://github.com/dpep/polyid/blob/93733fc/lib/polyid.rb#L101), now check the encoding first.\n\n`find(\"\\xFF\")` still raises, but that comes from ActiveRecord's own integer cast, not polyid.\n",
+  "headRefName": "invalid-encoding",
+  "headRefOid": "fcd68a761ac33676b43d56c05117e9c26bb85d85",
+  "headRepository": {
+    "id": "R_kgDOQD-jbw",
+    "name": "polyid",
+    "nameWithOwner": "dpep/polyid"
+  },
+  "headRepositoryOwner": {
+    "id": "MDQ6VXNlcjkxODgwNA==",
+    "name": "Daniel Pepper",
+    "login": "dpep"
+  },
+  "state": "MERGED"
+}

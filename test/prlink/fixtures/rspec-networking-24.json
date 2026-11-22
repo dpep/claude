@@ -1,0 +1,18 @@
+{
+  "baseRefName": "main",
+  "baseRefOid": "1392908eb61600409ed8ff470126d60f9fdbde08",
+  "body": "Fixes in [`be_an_ip_address`](https://github.com/dpep/rspec-networking/blob/1a0f69e/lib/rspec/networking/ip_address.rb):\n\n- **CIDR ranges matched:** `IPAddr.new` parses `\"10.0.0.0/8\"` as a network, so it passed. Addresses with a [non-host prefix](https://github.com/dpep/rspec-networking/blob/1a0f69e/lib/rspec/networking/ip_address.rb#L22) are now rejected, via [`IPAddr#prefix`](https://github.com/ruby/ipaddr/blob/v1.2.8/lib/ipaddr.rb#L460).\n- **Error handling:** it [rescues `IPAddr::Error`](https://github.com/dpep/rspec-networking/blob/1a0f69e/lib/rspec/networking/ip_address.rb#L29), the parent of both [`InvalidAddressError` and `AddressFamilyError`](https://github.com/ruby/ipaddr/blob/v1.2.8/lib/ipaddr.rb#L90-L98), instead of [only the first](https://github.com/dpep/rspec-networking/blob/0e7e7cb/lib/rspec/networking/ip_address.rb#L32).\n- **Messages:** RSpec now builds the failure messages from [`description`](https://github.com/dpep/rspec-networking/blob/1a0f69e/lib/rspec/networking/ip_address.rb#L33). This fixes `nil` showing as `''` and the [`\"an IPv4 localhost \"`](https://github.com/dpep/rspec-networking/blob/0e7e7cb/lib/rspec/networking/ip_address.rb#L38) description, which was missing \"address\".\n- The README now documents `.v6`.\n\n**Behavior change:** CIDR strings no longer match.\n\n\n",
+  "headRefName": "fix-ip-matcher",
+  "headRefOid": "9e22b22fb1e43f305a0d3c2e7eb805130dd62585",
+  "headRepository": {
+    "id": "R_kgDOMqudUg",
+    "name": "rspec-networking",
+    "nameWithOwner": "dpep/rspec-networking"
+  },
+  "headRepositoryOwner": {
+    "id": "MDQ6VXNlcjkxODgwNA==",
+    "name": "Daniel Pepper",
+    "login": "dpep"
+  },
+  "state": "MERGED"
+}

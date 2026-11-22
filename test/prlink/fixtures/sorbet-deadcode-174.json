@@ -1,0 +1,18 @@
+{
+  "baseRefName": "main",
+  "baseRefOid": "a417b2db34230ac5f8473ef2e012ee3fabab4ab9",
+  "body": "## What's wrong\n\n[`Client#start_server`](https://github.com/corsonknowles/sorbet-deadcode/blob/a417b2d/lib/sorbet_deadcode/lsp/client.rb#L94) stores the third value from `Open3.popen3` as `@stderr_thread`, but it's the stderr IO, not a thread. [`shutdown`](https://github.com/corsonknowles/sorbet-deadcode/blob/a417b2d/lib/sorbet_deadcode/lsp/client.rb#L69) then calls `join` on it, so every `--lsp` / `--hybrid` run raises `NoMethodError` after validating and loses its results.\n\n## The fix\n\nRead stderr in a thread and store that thread as `@stderr_thread`. Reading stderr also stops a server that logs a lot from filling the pipe and stalling.\n\n## Tests\n\n`test_initialize_spawns_server_and_handshakes` now passes a real stderr pipe and calls `shutdown`; it raises `NoMethodError` on main. `bundle exec rake` passes: 100% line and branch coverage, RuboCop clean.\n",
+  "headRefName": "fix-lsp-stderr",
+  "headRefOid": "56fc88e9b8046ca535d93c8325f1dcd2df7f69d0",
+  "headRepository": {
+    "id": "R_kgDOV2UdTw",
+    "name": "sorbet-deadcode",
+    "nameWithOwner": "dpep/sorbet-deadcode"
+  },
+  "headRepositoryOwner": {
+    "id": "MDQ6VXNlcjkxODgwNA==",
+    "name": "Daniel Pepper",
+    "login": "dpep"
+  },
+  "state": "OPEN"
+}

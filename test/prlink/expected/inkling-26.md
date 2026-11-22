@@ -1,0 +1,15 @@
+Feedback from a few days of watching dozens of work pull requests, most of them on Buildkite: most `checks success → failure` pushes were stale or unactionable. This is the check-reading half of the fix. Holding red until a second reading agrees, and batching pushes, follow in a separate PR because they change [`push.rs`](https://github.com/dpep/inkling/blob/63b6da3/src/push.rs).
+
+**Commit statuses are read.** Buildkite posts a commit status, not a check run, and the query only selected `CheckRun`. A red status was never named, and GitHub's verdict was trusted even when the only other red was a superseded run. The query now selects `StatusContext { context state }`. Each status is its own check (`identity`) because GitHub keeps only the newest per context, and `PENDING`/`EXPECTED` count as running (`running`). Fixture recorded from buildkite/agent#4460, whose label check was re-run green beside a red Buildkite build.
+
+**`github.ignore_checks`.** A list of exact check names that never turn a pull request red or hold it pending, for things like a merge lock or a label policy (buildkite/agent#4458 is red only because of "Require category label"). [`Response::ignore`](https://github.com/dpep/inkling/blob/75c58c0/src/adapters/github.rs#L321) drops them before anything judges the rollup. Once any check is dropped, the verdict comes from what's left, because GitHub's own state still counts the dropped checks. [`GitHubProvider::from_config`](https://github.com/dpep/inkling/blob/75c58c0/src/adapters/github.rs#L35) is now the only way callers build the provider, so none of them can miss the list.
+
+**A broken query is an error.** While adding the status fields, one extra brace made every pull request read as vanished (`wait` exit 5, "no such reference"). A GraphQL error with no path now becomes [`RefError::Other`](https://github.com/dpep/inkling/blob/63b6da3/src/ports.rs#L103) with GitHub's message (`interpret`). A test now checks that the generated query's braces balance.
+
+**Prose no longer names a watch target.** Opening this PR also watched buildkite/agent#4458 and #4460, because the PR body, written by a heredoc in the same Bash call as `gh pr create`, linked to them. The `post-tool` hook now reads only the `gh pr` command's own segment, up to any `--body`/`--title` (`arguments`). It reads none of `create`'s arguments and none of `view`'s output, because `view` prints the body. Cost: a bare `gh pr view` no longer counts as touching the current branch's PR, though `git push` still does.
+
+The feedback is recorded in [`docs/dogfood.md`](https://github.com/dpep/inkling/blob/75c58c0/docs/dogfood.md).
+
+Verified live: `inkling wait --until checks` against buildkite/agent#4460 and #4458, using scratch state paths.
+
+Dogfood: the `post-tool` hook registered this PR when it was opened (rung 4), plus the two stray watches above. A background `inkling wait --until checks` returned green after 1m 39s. The push `inkling: github.com/dpep/inkling#26 checks pending → success` arrived mid-turn about 15s later and was actionable without another lookup. The wait and the server each polled on their own.

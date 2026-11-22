@@ -1,0 +1,18 @@
+{
+  "baseRefName": "main",
+  "baseRefOid": "60dfb549af474667aa7a0a2d13a8a7d8e84f2ffb",
+  "body": "Found in a bug hunt: each test and fixture ran against a **snapshot** of its module's globals. Correct plain-pytest tests failed with the plugin installed:\n- `global COUNT; COUNT += 1` was lost, so the next test saw `0`\n- a helper doing `global _state; _state = 1`, or a fixture setting a module global, wasn't visible to the test\n- `monkeypatch.setattr(sys.modules[__name__], \"TIMEOUT\", 0)` had no effect\n\n### Change\n- [`_LiveGlobals`](https://github.com/dpep/pytest-autofixture/blob/fda8b3e/pytest_autofixture/__init__.py#L95) replaces the copy.\n  - **Reads:** globals that aren't an exact dict take the slow path through `__getitem__`, which reads the module live and hides fixture objects (raising `KeyError` falls through to builtins, then to the fixture).\n  - **Writes:** `STORE_GLOBAL` bypasses `__setitem__`, so `global` writes land in the view and `write_back()` copies them to the module after the call.\n  - **Dunders:** it copies only the module dunders, since C code reads those directly.\n- Class bodies (and `exec`) use `LOAD_NAME`, which reads globals without `__getitem__`. So the builtins fallback ([`_module_value`](https://github.com/dpep/pytest-autofixture/blob/fda8b3e/pytest_autofixture/__init__.py#L46)) checks the live module before fixtures.\n- [`_swap`](https://github.com/dpep/pytest-autofixture/blob/fda8b3e/pytest_autofixture/__init__.py#L126) is simplified now that it builds the namespace itself.\n\n[Regression test](https://github.com/dpep/pytest-autofixture/blob/fda8b3e/tests/test_isolated.py#L259) covers all four cases plus a class body inside a test. Passes on Python 3.11, 3.12 and 3.14 locally; CI covers 3.13.\n\n### Cost\nThe bug hunt's harness: 500 tests in a module with 5k globals, best of 3 runs, wall clock including startup.\n\n| | time |\n|---|---|\n| without plugin | 0.27 s |\n| snapshot | 0.43 s |\n| live | 0.29 s |\n\nEach global load is slower, about 0.3 µs against 0.04 µs, but the per-call copy of the whole module is gone.\n\nRemaining gap: a helper that reads a global the test itself just wrote with `global` sees the old value until the test returns. That's rare, so no fix for now.\n\nNo changelog entry: the snapshot was introduced after 0.2.1 and never released.\n",
+  "headRefName": "live-globals",
+  "headRefOid": "fda8b3ef6106ce1e6126548488104f856f717468",
+  "headRepository": {
+    "id": "R_kgDOMZ4-pQ",
+    "name": "pytest-autofixture",
+    "nameWithOwner": "dpep/pytest-autofixture"
+  },
+  "headRepositoryOwner": {
+    "id": "MDQ6VXNlcjkxODgwNA==",
+    "name": "Daniel Pepper",
+    "login": "dpep"
+  },
+  "state": "MERGED"
+}

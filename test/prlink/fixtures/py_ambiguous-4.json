@@ -1,0 +1,18 @@
+{
+  "baseRefName": "main",
+  "baseRefOid": "a6489901eef92b4e0aa0905f190eb6982bf2549a",
+  "body": "Two descriptor bugs in `ambiguous.py`, plus the simplification that falls out of fixing them. Split from #2.\n\n### Bug 1: an instance that evaluates as false gets the unbound function\n```python\nclass Empty:\n  def __len__(self): return 0\n\n  @ambiguous.method\n  def name(self): return 'empty'\n\nEmpty().name()  # TypeError: Empty.name() missing 1 required positional argument: 'self'\n```\n**Cause:** the descriptor tested `if obj:` to tell instance access from class access. `Empty()` is falsy, so it was treated as `Empty.name`.\n\n**Fix:** [`_AmbiguousMethod.__get__`](https://github.com/dpep/py_ambiguous/blob/b66e3ec/ambiguous/ambiguous.py#L43) checks `obj is None`, the standard descriptor idiom.\n\n### Bug 2: subclasses of an `@ambiguous` class get the parent as `cls`\n```python\n@ambiguous\nclass A:\n  @classmethod\n  def who(cls): return cls.__name__\n\nclass B(A): pass\n\nB.who()  # 'A', expected 'B'\n```\n**Cause:** `ambiguous_class` used `inspect.getmembers(cls)`, which returns classmethods already bound to `A`. It then wrapped that bound method once, at decoration time, so every later lookup reused `A`. The `@ambiguous.classmethod` helper didn't have this bug because it binds at lookup.\n\n**Fix:** keep the raw `classmethod` / `staticmethod` object and wrap it in [`_AmbiguousDescriptor`](https://github.com/dpep/py_ambiguous/blob/b66e3ec/ambiguous/ambiguous.py#L55), which binds on each lookup against whichever class did the lookup.\n\n### Simplification\n- The three per-call descriptor class factories become those two module-level descriptor classes. [`ambiguous_classmethod`](https://github.com/dpep/py_ambiguous/blob/b66e3ec/ambiguous/ambiguous.py#L69) is now just `_AmbiguousDescriptor(classmethod(func))`.\n- [`ambiguous_class`](https://github.com/dpep/py_ambiguous/blob/b66e3ec/ambiguous/ambiguous.py#L73) walks `vars(cls)`, the class's own attributes, instead of `getmembers` plus a lookup in `__dict__` and a type ladder. Inherited methods are still left alone, as before.\n- Drops the unused `AmbiguousType` base and the `inspect` / `MethodType` imports.\n\nTests: [`test_falsy_instance`](https://github.com/dpep/py_ambiguous/blob/b66e3ec/tests/test_ambiguous_object.py#L95) and [`test_subclass_classmethod`](https://github.com/dpep/py_ambiguous/blob/b66e3ec/tests/test_ambiguous_object.py#L108) failed before this change.\n",
+  "headRefName": "fix-falsy-and-subclass-methods",
+  "headRefOid": "486b9574e73c2f3bd958c36610130f135d432266",
+  "headRepository": {
+    "id": "MDEwOlJlcG9zaXRvcnkxMjI1NDgyODM=",
+    "name": "py_ambiguous",
+    "nameWithOwner": "dpep/py_ambiguous"
+  },
+  "headRepositoryOwner": {
+    "id": "MDQ6VXNlcjkxODgwNA==",
+    "name": "Daniel Pepper",
+    "login": "dpep"
+  },
+  "state": "MERGED"
+}

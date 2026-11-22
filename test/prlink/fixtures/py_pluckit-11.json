@@ -1,0 +1,18 @@
+{
+  "baseRefName": "drop-assert",
+  "baseRefOid": "b45e1d9b0b96153aa282c78b4efa71464858cba1",
+  "body": "The regex used to run inside the evaluation loop, so a syntax error was only caught if the data got that far: `pluck([], '!!bad')` returned `[]`, and `pluckit([], '*.a.')` passed. Now [`parse_path`](https://github.com/dpep/py_pluckit/blob/3154a03/pluckit/pluckit.py#L40) turns the whole path into steps (cached), [`_walk`](https://github.com/dpep/py_pluckit/blob/3154a03/pluckit/pluckit.py#L70) applies them, and [`pluck` validates up front](https://github.com/dpep/py_pluckit/blob/3154a03/pluckit/pluck.py#L16).\n\nThe regex is unchanged; only when it runs moves. I compared the old and new code on 240k random path/data combinations. The only difference was the new code raising ValueError where the old code skipped validation.\n\nPart 8 of 11 in a stack (based on #10). Merge them in order.",
+  "headRefName": "parse-up-front",
+  "headRefOid": "7ddc944c7a1a2fa7705cfe319866f1d91ff7a562",
+  "headRepository": {
+    "id": "MDEwOlJlcG9zaXRvcnkxMzA5NjUwMDc=",
+    "name": "py_pluckit",
+    "nameWithOwner": "dpep/py_pluckit"
+  },
+  "headRepositoryOwner": {
+    "id": "MDQ6VXNlcjkxODgwNA==",
+    "name": "Daniel Pepper",
+    "login": "dpep"
+  },
+  "state": "MERGED"
+}
