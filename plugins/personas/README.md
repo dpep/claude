@@ -6,7 +6,7 @@ Personas are Claude Code subagents: invoke them by intent ("analyze this dynamic
 
 Two families live here:
 
-- **Craft & analysis personas** — deep expertise or a specific analytical lens you summon to do or examine work (`analyst`, `decomposer`, `librarian`, `negotiator`, `pythonista`, `realtor`, `recruiter`, `rubyist`, `rustacean`).
+- **Craft & analysis personas** — deep expertise or a specific analytical lens you summon to do or examine work (`algorithmist`, `analyst`, `decomposer`, `librarian`, `negotiator`, `pythonista`, `realtor`, `recruiter`, `rubyist`, `rustacean`, `scribe`).
 - **The decision council** — a set of role-based viewpoints you convene to pressure-test a decision, plus a `moderator` who chairs them.
 
 Most personas work in **two modes**: *critique* (examine a plan/design/codebase from this viewpoint) and *do* (produce the artifact or write the code in this voice). The `analyst` is the deliberate exception — descriptive and read-only by design.
