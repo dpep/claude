@@ -162,20 +162,23 @@ rq Widget -l 1 --json          # just the top hit
 
 ## Many lookups at once
 
-Looking up a list of names? Pipe them on stdin, one per line, with `-J`. rq
-resolves the repo and opens the index once instead of per query — roughly 2x
-faster on a mid-size repo and 4x on a large monorepo, where it matters most.
+Looking up a list of names? Pipe them on stdin, one per line; the answers come
+back as NDJSON. rq resolves the repo and opens the index once instead of per
+query — roughly 2x faster on a mid-size repo and 4x on a large monorepo, where
+it matters most.
 
 ```sh
-printf 'WidgetProcessor\nAccount\nNoSuchThing\n' | rq -J
-rq -J < names.txt
+printf 'WidgetProcessor\nAccount\nNoSuchThing\n' | rq
+rq < names.txt
 ```
 
 Every row carries the `query` it answers, and a miss still reports
-`{"query": …, "status": "no_match"}` rather than vanishing. The run exits 0 if
-any query matched, non-zero only if all missed — so read each row's `status`,
-not the exit code. Needs `-J` (`--json` can't frame several result sets);
-`--show`/`--open` don't apply. `--anchor` does.
+`{"query": …, "status": "no_match"}` rather than vanishing. Match rows to
+queries by `query`, not position: blank lines are skipped, and each query
+returns up to 10 rows (`-l 1` for one each). The run exits 0 if any query
+matched, even while other rows are misses or `warming` — so read each row's
+`status`, not the exit code. Don't add `--json` (refused; the output is already
+NDJSON). `--show`/`--open` don't apply. `--anchor` does.
 
 ## Outline a file
 
@@ -187,6 +190,10 @@ right span instead of scanning the whole thing.
 rq --symbols app/models/widget.rb --json
 rq --symbols app/models/widget.rb -k method --json   # just the methods
 ```
+
+A file with no definitions is `no_match` (exit 1). A minified bundle is held
+unparsed and says so with `"reason": "minified"`: read it with `rg`, not rq.
+`--symbols` takes a file, not a directory.
 
 A class method carries `"singleton": true` — `def self.x`, anything inside
 `class << self` (its `private` section too), a `module_function`, a Python
@@ -209,7 +216,7 @@ cargo install --git https://github.com/dpep/rq
 ```
 
 To update: `brew upgrade dpep/tools/rq` (or re-run the `cargo install --git …`
-line). `--anchor` and the `root` field need rq 0.53 or newer. Source and issues:
+line). Source and issues:
 <https://github.com/dpep/rq>.
 
 ## Notes
