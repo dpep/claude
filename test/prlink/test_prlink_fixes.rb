@@ -137,6 +137,17 @@ class PrlinkFixesTest < Minitest::Test
     assert_equal "tool_missing", doc["refs"][0]["cause"]
   end
 
+  def test_rq_runs_with_prlink_named_as_its_caller
+    Dir.mktmpdir do |d|
+      log = File.join(d, "caller")
+      stub = File.join(d, "rq")
+      File.write(stub, "#!/bin/sh\nprintf '%s\\n' \"$RQ_CALLER\" >> #{log}\necho '[]'\n")
+      File.chmod(0o755, stub)
+      run_body("`Thing#solo`\n", env: { "PRLINK_RQ" => stub })
+      assert_equal ["prlink"], File.readlines(log, chomp: true).uniq
+    end
+  end
+
   # --- loud where it was quiet ---
 
   def test_unpushed_head_is_loud_and_write_refuses

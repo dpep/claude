@@ -516,7 +516,7 @@ module Prlink
       return @ok unless @ok.nil?
 
       @ok = begin
-        Open3.capture3(@bin, "--version")[2].success?
+        Open3.capture3(CALLER_ENV, @bin, "--version")[2].success?
       rescue SystemCallError
         false
       end
@@ -528,11 +528,14 @@ module Prlink
       @bin == tool ? tool : "#{tool} (#{@bin})"
     end
 
+    # names prlink as the caller in `rq --usage`; trekr ignores it
+    CALLER_ENV = { "RQ_CALLER" => "prlink" }.freeze
+
     # [parsed JSON or nil, exit status or nil]
     def call(dir, *args)
       @cache.fetch([dir, args]) do
         @cache[[dir, args]] = begin
-          out, _err, st = Open3.capture3(@bin, *args, chdir: dir)
+          out, _err, st = Open3.capture3(CALLER_ENV, @bin, *args, chdir: dir)
           v = JSON.parse(out)
           [v.is_a?(Hash) && v["error"] ? nil : v, st.exitstatus]
         rescue JSON::ParserError
