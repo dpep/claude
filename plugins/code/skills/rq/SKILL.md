@@ -132,9 +132,8 @@ each means one thing:
   class. `.` and `#` both mean "inside", not class vs instance method: read
   `singleton` to tell them apart. A scope that isn't a class matches the path instead: a Go package
   (`hugolib.HugoSites`), a Python module (`django.db.models.QuerySet`), a Rust
-  module (`mpsc::Sender`). `rq Account.new` prefers the class's own constructor (`initialize`,
-  `__init__`, `constructor`); when it inherits one, rq may answer the class
-  itself or another `Account`'s constructor, so check `parent`.
+  module (`mpsc::Sender`). `rq Account.new` answers the class's own constructor (`initialize`,
+  `__init__`, `constructor`), or the class itself when it inherits one.
 - **Kind.** `rq save -k method`, or the shorthand `rq method save`. Kinds are
   `class`/`module`/`method`/`function`/`struct`/`enum`/`trait`/`constant`/
   `type`/`variant`/`macro`/`field` (shortcuts `c`/`mod`/`m`/`f`/`s`/`e`/`t`/`const`/`v`,
@@ -161,8 +160,11 @@ each means one thing:
 - **Repo.** Results come from the current repo by default; `-a`/`--all-repos`
   searches every repo you've indexed (so `no_match` means absent *here*).
 - **Wildcards.** `*` (any run) and `?` (one char) — **quote them** so the shell
-  doesn't glob: `rq 'Widget*proc'`. A lone trailing `?` is part of the name, so
-  `rq 'valid?'` finds a Ruby predicate. `::`, `#` and `.` need no quoting.
+  doesn't glob: `rq 'Widget*proc'`. A pattern matches anywhere in the name, as
+  if starred at both ends; an edge `*` only ranks: `'*Error'` puts names ending
+  in `Error` first, `'Act*'` names starting with `Act`. A lone trailing `?` is
+  part of the name, so `rq 'valid?'` finds a Ruby predicate. `::`, `#` and `.`
+  need no quoting.
 
 ```sh
 rq save -k method app/models --json
