@@ -91,6 +91,29 @@ branches=$(git -C "$g" branch --format='%(refname:short)')
 refute "branches --apply: deletes merged" "$branches" "merged"
 check "branches --apply: keeps unmerged" "$branches" "wip"
 
+# Claude session scratch: an idle session's build cache and big DB go; notes,
+# small DBs, a DB inside the cache (listed once), and a live session stay.
+sc="$tmp/scratch"
+idle="$sc/proj/idle/scratchpad" live="$sc/proj/live/scratchpad"
+mkdir -p "$idle/lane-target/debug" "$idle/notes" "$live/target"
+touch "$idle/lane-target/CACHEDIR.TAG" "$live/target/CACHEDIR.TAG"
+big() { dd if=/dev/zero of="$1" bs=1 count=0 seek=53477376 2>/dev/null; }
+big "$idle/index.db" && big "$idle/lane-target/debug/cached.db"
+echo small >"$idle/small.db" && echo keep >"$idle/notes/FOLLOWUPS.md"
+age "$sc/proj/idle"
+export CODE_GC_SCRATCH="$sc"
+
+out=$("$gc" scratch)
+check "scratch: finds idle build cache" "$out" "$idle/lane-target"
+check "scratch: finds big DB" "$out" "$idle/index.db"
+refute "scratch: lists a DB inside a cache once" "$out" "cached.db"
+refute "scratch: skips small DB" "$out" "small.db"
+refute "scratch: skips live session" "$out" "$live"
+
+"$gc" scratch --apply >/dev/null
+[ ! -e "$idle/lane-target" ] && [ ! -e "$idle/index.db" ] && [ -f "$idle/small.db" ] && [ -f "$idle/notes/FOLLOWUPS.md" ] && [ -d "$live/target" ] \
+  && echo "ok   scratch --apply" || { echo "FAIL scratch --apply"; failures=$((failures + 1)); }
+
 out=$("$gc" bogus 2>&1); code=$?
 [ $code -eq 2 ] && echo "ok   unknown command exits 2" || { echo "FAIL unknown command exit $code"; failures=$((failures + 1)); }
 

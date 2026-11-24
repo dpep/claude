@@ -1,6 +1,6 @@
 ---
 name: gc
-description: Reclaim disk space from a machine full of code checkouts — Rust target/ dirs, stale node_modules and virtualenvs, abandoned agent worktrees, merged branches, and package-manager / app-updater caches. Use for "free up disk space", "my disk is full", "clean up old builds", "what's bloating my code dir", or a periodic sweep. Drives the `code-gc` script; per-repo git judgement calls hand off to the git skill's optimize subskill.
+description: Reclaim disk space from a machine full of code checkouts — Rust target/ dirs, stale node_modules and virtualenvs, abandoned agent worktrees, Claude session scratch, merged branches, and package-manager / app-updater caches. Use for "free up disk space", "my disk is full", "clean up old builds", "what's bloating my code dir", or a periodic sweep. Drives the `code-gc` script; per-repo git judgement calls hand off to the git skill's optimize subskill.
 ---
 
 # gc
@@ -19,6 +19,8 @@ code-gc deps      [--days N] [--apply] [ROOT...]
                                             with no source edit in N days (default 30)
 code-gc worktrees [ROOT...]                 linked worktrees: size, unmerged, dirty, branch
 code-gc branches  [--apply] [ROOT...]       branches merged into main/master; --apply = git branch -d
+code-gc scratch   [--days N] [--apply]      Claude session scratch idle N days (default 1):
+                                            build caches and SQLite files over 50 MB
 ```
 
 ROOT defaults to `.`; pass the directory your checkouts live under (e.g. `~/code`).
@@ -33,6 +35,13 @@ code-gc survey <root>
 
 Say where the bytes are before deleting anything. On a Rust-heavy machine,
 `target/` dirs are usually most of it — a single crate's can reach 10GB+.
+After multi-agent work, check Claude's session scratch (`/tmp/claude-<uid>`)
+too: lanes build into their own target dirs and copy data there, outside any
+ROOT. One sweep found 160 GB there against 38 GB under `~/code`.
+
+**Disk at zero?** Claude Code can't capture a command's output, so no command
+runs at all. Hand the user the `code-gc … --apply` lines to run in another
+terminal, then carry on once there's room.
 
 ## 2. Regenerable — delete after one confirmation
 
@@ -42,6 +51,7 @@ Present the list with sizes, get a single yes, then apply.
 | --- | --- | --- |
 | Rust build output | `code-gc targets <root>` | `code-gc targets --apply <root>` |
 | Stale dependencies | `code-gc deps <root>` | `code-gc deps --apply <root>` |
+| Claude session scratch | `code-gc scratch` | `code-gc scratch --apply` |
 | Homebrew | — | `brew cleanup --prune=all -s` |
 | Language caches | `du -sh ~/Library/Caches/{pip,pipenv,Yarn} ~/.cargo/registry` | `rm -rf` the dirs |
 | App self-updaters | `du -sh ~/Library/Caches/*ShipIt* ~/Library/Caches/*updater*` | `rm -rf` the dirs |
@@ -56,6 +66,10 @@ Present the list with sizes, get a single yes, then apply.
   is now broken: rebuild it right away.
 - `deps` treats a project as live if *any* source file changed within
   `--days`, so a project in active use keeps its `node_modules`.
+- `scratch` skips any session with a file changed in the last `--days`, so a
+  running agent keeps its build. A build cache is any dir holding
+  `CACHEDIR.TAG` (Cargo writes one into every target dir, wherever
+  `CARGO_TARGET_DIR` puts it). Logs, briefs and notes stay.
 - `*.ShipIt` dirs hold downloaded app updates that were already applied.
 - Leave `~/.cargo/registry` unless space is desperate — every crate re-downloads.
 

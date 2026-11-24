@@ -17,14 +17,18 @@ usage: code-gc <command> [options] [ROOT...]     (ROOT defaults to .)
   worktrees                  linked worktrees: size, branch, unmerged patches, dirty files
   branches  [--apply]        local branches whose tip is an ancestor of main/master;
                              --apply uses `git branch -d`, which refuses anything else
+  scratch   [--days N] [--apply]
+                             Claude session scratch idle N days (default 1): build
+                             caches (a dir holding CACHEDIR.TAG, e.g. a CARGO_TARGET_DIR)
+                             and SQLite files over 50 MB. Ignores ROOT; logs and notes stay
 
 Without --apply nothing is deleted. CODE_GC_BIN_DIRS (space-separated) overrides
-where `targets` looks for symlinked binaries.
+where `targets` looks for symlinked binaries; CODE_GC_SCRATCH, where `scratch` looks.
 EOF
 }
 
 apply=0
-days=30
+days=
 roots=()
 
 # Deleting only happens on an explicit --apply; everything else just reports.
@@ -119,6 +123,30 @@ list_repos() {
     -name .git -type d -prune -print 2>/dev/null | sed 's#/\.git$##'
 }
 
+scratch_base=${CODE_GC_SCRATCH:-/tmp/claude-$(id -u)}
+
+# Sessions (project/session dirs) where nothing changed in N days, so no agent is using them.
+idle_sessions() {
+  find "$scratch_base" -mindepth 2 -maxdepth 2 -type d 2>/dev/null |
+    while IFS= read -r s; do
+      [ -z "$(find "$s" -type f -mtime "-$days" -print 2>/dev/null | head -1)" ] && echo "$s"
+    done
+  return 0
+}
+
+# Build caches mark themselves with CACHEDIR.TAG (Cargo does); big SQLite files are index
+# copies. A DB inside a listed cache is covered by the cache, so it isn't listed twice.
+list_scratch() {
+  idle_sessions | while IFS= read -r s; do
+    find "$s" -name CACHEDIR.TAG -type f 2>/dev/null | sed 's#/CACHEDIR.TAG$##' | sort -u > "$tmp"
+    cat "$tmp"
+    find "$s" -type f \( -name '*.db' -o -name '*.db-wal' -o -name '*.sqlite' -o -name '*.sqlite3' -o -name '*.sqlite-wal' \) \
+      -size +50M 2>/dev/null |
+      awk 'NR == FNR { c[NR] = $0 "/"; n = NR; next }
+           { for (i = 1; i <= n; i++) if (index($0, c[i]) == 1) next; print }' "$tmp" -
+  done
+}
+
 main_branch() {
   local b
   b=$(git -C "$1" symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##')
@@ -142,6 +170,7 @@ cmd_targets() {
 }
 
 cmd_deps() {
+  days=${days:-30}
   if [ $apply -eq 1 ]; then list_deps | remove; echo "removed"; else list_deps | sized; fi
 }
 
@@ -164,6 +193,12 @@ cmd_worktrees() {
   done
 }
 
+cmd_scratch() {
+  days=${days:-1}
+  tmp=$(mktemp); trap 'rm -f "$tmp"' EXIT
+  if [ $apply -eq 1 ]; then list_scratch | remove; echo "removed"; else list_scratch | sized; fi
+}
+
 cmd_branches() {
   list_repos | while IFS= read -r repo; do
     main=$(main_branch "$repo")
@@ -181,10 +216,12 @@ cmd_branches() {
 }
 
 cmd_survey() {
+  days=${days:-30}
   printf 'rust targets\t%s\n' "$(list_targets | sized | tail -1 | cut -f1)"
   printf 'stale deps (%sd)\t%s\n' "$days" "$(list_deps | sized | tail -1 | cut -f1)"
   printf 'linked worktrees\t%s\n' "$(list_repos | while IFS= read -r r; do
     git -C "$r" worktree list --porcelain | awk 'NR>1 && /^worktree /{print substr($0,10)}'; done | sized | tail -1 | cut -f1)"
+  printf 'claude scratch (idle 1d)\t%s\n' "$(days=1; tmp=$(mktemp); list_scratch | sized | tail -1 | cut -f1; rm -f "$tmp")"
 }
 
 cmd=${1:-}
@@ -198,6 +235,7 @@ case "$cmd" in
   deps) cmd_deps ;;
   worktrees) cmd_worktrees ;;
   branches) cmd_branches ;;
+  scratch) cmd_scratch ;;
   -h|--help|help) usage ;;
   *) echo "code-gc: unknown command $cmd" >&2; usage >&2; exit 2 ;;
 esac
