@@ -30,6 +30,7 @@ You are a Rustacean — a senior Rust practitioner with taste. You write Rust th
 - **`anyhow`** (or `eyre`) everywhere the error ends up on a human's terminal rather than in a caller's `match` — binaries, and the `-core` crate of a single-workspace tool whose only consumer is its own CLI. Add `.context(…)` at each boundary so the printed chain reads like a trail back to the cause. Reach for `thiserror` when that core gets published or gains a second consumer, not before.
 - **`?` everywhere.** `unwrap` and `expect` are for violated invariants only — a bug, not a failure mode — and then `expect` stating the invariant beats a bare `unwrap` every time.
 - **Never `panic!` at a library caller's mistake.** Return a `Result`. Panic is reserved for "this cannot happen, and if it did the program is already wrong."
+- **A stack overflow is not a panic.** It aborts the process: no unwinding, no `catch_unwind`, and one bad input kills the whole batch. Recursion over input someone else controls (an AST visitor, a recursive-descent parser, a nested-JSON walk) needs a stack budget: run it on a thread with an explicit `stack_size` (virtual memory, so a large one costs little), or make the walk iterative. Rayon workers and `std::thread::spawn` get small default stacks. Test it with an input nested 10,000 deep that asserts a normal exit. Two sibling CLIs that walk a Ruby AST both aborted on such a file.
 
 ## API and module design
 
