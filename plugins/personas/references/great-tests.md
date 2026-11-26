@@ -1,6 +1,6 @@
 # What Makes a Great Test
 
-Reference for the `test-engineer` persona. The throughline: **a test is worth keeping when it fails for a real regression and stays green through a refactor.** Those are the two halves of its value, and most bad tests fail one of them. A test that runs the code but can't see the change is a false sense of safety; a test that breaks whenever the internals move is a tax on every future change, and teams learn to "fix" it by updating the expectation, which is how it stops catching anything. **Fewer tests that each prove something beat many that each prove a little.**
+Reference for the `test-engineer` persona. The throughline: **a test is worth keeping when it fails for a real regression and stays green through a refactor.** Most bad tests fail one half. A test that runs the code but can't see the change is false safety. A test that breaks whenever the internals move is a tax on every future change, and teams learn to "fix" it by updating the expectation, which is how it stops catching anything. **Fewer tests that each prove something beat many that each prove a little.**
 
 ## 1. The two properties that make a test valuable
 
@@ -11,13 +11,13 @@ Kent Beck's *Test Desiderata* lists twelve properties a test can have. Two of th
 
 Vladimir Khorikov names the same pair as the first two of his *four pillars* of a good test: **protection against regressions** and **resistance to refactoring**, alongside **fast feedback** and **maintainability**. A test's value is roughly the product of the four, so a zero on any one zeroes the test. Khorikov treats resistance to refactoring as the one not to trade away: a test either couples to implementation or it doesn't, and one that does raises false alarms forever. The real trade is between regression protection and speed, which is where test size comes in (§7).
 
-Kent C. Dodds puts the two failure modes in plain terms. A test coupled to implementation details gives a **false negative** when a behaviour-preserving refactor breaks it ("a test failure, but it was because of a broken test, not broken app code") and a **false positive** when it passes while the software is broken. The same coupling usually causes both, because a test that watches the internals isn't watching the behaviour.
+Kent C. Dodds names the two failure modes plainly. A test coupled to implementation details gives a **false negative** when a behaviour-preserving refactor breaks it ("a test failure, but it was because of a broken test, not broken app code") and a **false positive** when it passes while the software is broken. One coupling usually causes both: a test watching the internals isn't watching the behaviour.
 
-**Resistant doesn't mean never edited.** Renaming a public method, or changing what the system is supposed to do, rightly changes its tests. The standard is that a refactor *which leaves the observable contract alone* doesn't. Google's *Software Engineering at Google* says it directly: "the ideal test is unchanging" — after it's written, it changes only when the requirements do.
+**Resistant doesn't mean never edited.** Renaming a public method, or changing what the system is supposed to do, rightly changes its tests. A refactor *that leaves the observable contract alone* shouldn't. Google's *Software Engineering at Google* says it directly: "the ideal test is unchanging" — after it's written, it changes only when the requirements do.
 
 ## 2. Test behaviour through the surface a caller uses
 
-The rule that delivers both properties at once: **exercise the code the way its callers do, and assert on what they can observe.** Google's testing chapter frames it as testing via public APIs, testing state rather than interactions, and writing a test per *behaviour* rather than per method — one method can have several behaviours, and one behaviour can span several methods.
+One rule delivers both properties: **exercise the code the way its callers do, and assert on what they can observe.** Google's testing chapter frames it as testing via public APIs, testing state rather than interactions, and writing a test per *behaviour* rather than per method. One method can have several behaviours, and one behaviour can span several methods.
 
 "Public" means the boundary a caller crosses, not every method that happens to be visible. A helper class that exists only to serve one module is that module's implementation detail, even if the language makes it public; test it through the module unless it carries enough logic to deserve its own contract. A behaviour you can't reach from the caller's side is design feedback — either it isn't a behaviour anyone depends on, or the interface is missing something.
 
@@ -25,17 +25,17 @@ Dodds's version, from UI testing, generalizes: code has users — the people who
 
 ## 3. Would it fail if the change were reverted?
 
-The sharpest question to ask of a test written for a change: **if this change were reverted, would this test fail, and on which assertion?** It turns "is it tested" from a judgement into an experiment. A test exercises the change only when it calls the changed code on an input where the old and new code behave differently, *and* asserts on the part of the result that differs.
+The sharpest question for a test written for a change: **if this change were reverted, would this test fail, and on which assertion?** It turns "is it tested" from a judgement into an experiment. A test exercises the change only when it calls the changed code on an input where the old and new code behave differently, *and* asserts on the part of the result that differs.
 
 The standard earned its place in a review experiment. A general reviewer called a change "covered" whenever a test ran the changed code; only 4 of the 16 tests it named would actually have failed with the change reverted. A reviewer prompted to apply the revert standard named 15 tests, and 12 of them would have failed. The same reviewer also correctly said *no new tests needed* on three pure refactors, where the general reviewer had called them covered. In one real library change, 17 existing examples executed the changed line and none failed on the old code: a genuine gap that coverage reported as fully covered.
 
-Three limits to keep in mind:
+Three limits:
 
 - **Failing isn't enough; it has to fail on an assertion.** A new method reverted produces `NoMethodError` or a compile error, which any test that merely calls it will hit. That proves the method exists, not that it behaves. Ask which assertion would catch a *wrong* implementation.
 - **A refactor should pass the revert check both ways.** For a change that claims no behaviour change, the existing tests passing on old and new code is the evidence the claim is true. The question there is whether those tests are strong enough to have caught a slip, which is what mutation testing answers (§4).
 - **It is scoped to the change.** It says nothing about older, untested behaviour next door. That's a follow-up, not a gap in this change.
 
-The revert check can be done by reading, which is cheap and usually right, or by running the change's tests against head's tests over the base's code, which is definitive and costs about two runs of the affected spec files.
+The revert check can be done by reading, which is cheap and usually right, or by running the change's tests against the base's code, which is definitive and costs about two runs of the affected spec files.
 
 ## 4. Mutation testing measures test strength
 
@@ -43,9 +43,9 @@ Coverage says code was *executed*. Mutation testing says whether the tests would
 
 The evidence that it measures something real: Just et al. (FSE 2014) found that a suite's mutant detection rate correlates with its detection of real faults, more strongly than statement coverage does, and that about 73% of real faults were coupled to common mutants. Inozemtseva and Holmes used mutants as the yardstick for exactly that reason.
 
-The costs are real too:
+So are the costs:
 
-- **It's expensive.** Every mutant is a test run. Run it on the diff, not the codebase: `mutant --since main` (Ruby) and `cargo mutants --in-diff` (Rust) select only changed subjects. Google runs it only on changed lines during code review, after dropping lines without coverage and "arid" code (logging, plumbing) where a mutant tells you nothing.
+- **It's expensive.** Every mutant is a test run. Run it on the diff, not the codebase: `mutant --since origin/main` (Ruby) and `cargo mutants --in-diff` (Rust) select only changed subjects. Google runs it only on changed lines during code review, after dropping lines without coverage and "arid" code (logging, plumbing) where a mutant tells you nothing.
 - **Many survivors aren't worth a test.** When Google first surfaced mutants in review, developers rated about 85% of them not useful; filtering and per-line caps were what made the tool worth having. Equivalent mutants (a change that can't alter behaviour) and mutants in code no one cares about are noise.
 - **A survivor has two honest answers.** Add the test that pins the behaviour, or accept that the original code was redundant and simplify it. mutant's own docs say this. A third answer — "not worth pinning" — is fine when said out loud with a reason.
 
@@ -57,12 +57,9 @@ Inozemtseva and Holmes (ICSE 2014, a distinguished paper) found coverage only we
 
 Google's 2020 guidance is the sane middle: there is no ideal number; 60% is acceptable, 75% commendable, 90% exemplary; project-wide goals above 90% are probably not worth it — and **per-commit coverage of changed lines is the number to watch**, where a high bar (90–99%) is reasonable. Beck compared pride in 100% coverage to pride in reading every word of the newspaper. Dodds keeps his small published libraries at 100% because breakage hits many consumers and the code is small; applications get diminishing returns long before that.
 
-Make coverage diff-scoped and per-test where possible:
+Make coverage diff-scoped and per-test where possible (tools in §13). Together with the revert check it gives the precise gap: "executed by N tests, none fail on the old code."
 
-- **Ruby:** SimpleCov (1.2+) can record which example ran each line (`track_tests`), answer `simplecov tests FILE:LINE`, score only a change's lines with `simplecov patch --base REF`, and select affected tests. `undercover --compare origin/main` flags changed methods with no coverage.
-- **Rust:** `cargo llvm-cov` produces lcov; `diff-cover` (or a CI service) scopes it to the diff.
-
-Know the blind spots of line coverage: code inside strings (a Lua script in a heredoc, `class_eval` text) maps to the line that defines the string; a changed argument on a multi-line call maps to the call's first line. And coverage + the revert check together give the precise gap: "executed by N tests, none fail on the old code."
+Know line coverage's blind spots: code inside strings (a Lua script in a heredoc, `class_eval` text) maps to the line that defines the string, and a changed argument on a multi-line call maps to the call's first line.
 
 ## 6. Doubles: real when you can, mock at the edge
 
@@ -144,7 +141,7 @@ A table-driven rewrite can shrink a test file tenfold and keep every assertion. 
 
 **Granularity vs brittleness.** Fine-grained tests localize failures (Beck's *Specific*) but couple to structure; coarse ones survive refactors but fail vaguely. Resolve by choosing the *boundary*, not the size: test at the narrowest interface that callers actually depend on and that is stable. Go narrower only where the logic is dense enough that a coarse test can't enumerate its cases cheaply. A failing coarse test with a good failure message is specific enough.
 
-**Mocks vs real collaborators.** Doubles buy speed and determinism and cost fidelity and refactor-resistance. Resolve with Khorikov's line: real for anything inside your system or managed by it, a fake where real is too slow, a mock only for outbound effects on systems outside your control, behind an adapter you own.
+**Mocks vs real collaborators.** Doubles buy speed and determinism and cost fidelity and refactor-resistance. Resolve with Khorikov's line (§6): real for anything inside your system or managed by it, a fake where real is too slow, a mock only for outbound effects on systems outside your control, behind an adapter you own.
 
 **Coverage vs value.** Coverage is cheap and measures execution; value is regressions caught. Resolve by using coverage to *find* untested changed lines, the revert check to *prove* a change is caught, and mutation testing to *measure* strength when it's in doubt. Never write a test to move a coverage number.
 
@@ -160,14 +157,14 @@ A table-driven rewrite can shrink a test file tenfold and keep every assertion. 
 
 - Find tests by convention (`lib/a/b.rb` → `spec/a/b_spec.rb` or `test/a/b_test.rb`) and then by searching for the changed method, constant, or error class; shared examples and helpers can hold the test that matters.
 - Prefer verifying doubles (`instance_double`, `class_double`) — a plain `double` keeps passing after the real interface changes. `rubocop-rspec` cops (`RSpec/Focus`, `RSpec/AnyInstance`, `RSpec/VerifiedDoubles`, `RSpec/SubjectStub`) catch the mechanical smells if the repo runs them; don't repeat what a configured linter already reports.
-- Coverage: SimpleCov, with `track_tests` on 1.2+ for per-example mapping (an untracked `.simplecov` file can enable it without a repo edit); `undercover` for changed-but-uncovered methods.
+- Coverage: SimpleCov 1.2+ records which example ran each line (`track_tests`; an untracked `.simplecov` file can enable it without a repo edit), answers `simplecov tests FILE:LINE`, scores only a change's lines with `simplecov patch --base REF`, and selects affected tests. `undercover --compare origin/main` flags changed methods with no coverage.
 - Mutation: `mutant run --use rspec --since origin/main 'Namespace*'` (or `mutant-minitest`). Free for open source (`--usage opensource`); commercial use needs a paid licence, so check before proposing it on a private repo.
-- Flakiness: `--order random`, `--seed`, `--bisect`, `--only-failures`; freeze time with `travel_to` or Timecop; Prosopite or a query counter for N+1 regressions belongs to the performance side.
+- Flakiness: the seed, bisect and clock tools are in §9; `--only-failures` reruns just what failed. N+1 regressions (Prosopite, a query counter) belong to the performance side.
 
 **Rust**
 
 - Unit tests in `#[cfg(test)] mod tests` beside the code; integration tests in `tests/` can reach only the public API — the natural home for behaviour tests.
-- Coverage: `cargo llvm-cov` (lcov / html / `--show-missing-lines`); scope to the diff with `diff-cover` or CI.
+- Coverage: `cargo llvm-cov` (lcov / html / `--show-missing-lines`); scope it to the diff with `diff-cover` or a CI service.
 - Mutation: `cargo mutants --in-diff <(git diff origin/main)` on a change; outcomes are *caught*, *missed* (the finding), *timeout*, *unviable* (didn't compile). Exclude arid code with `--exclude-re` or `#[mutants::skip]` and a reason.
 - Flakiness: tests run in parallel threads by default; `-- --test-threads=1` to test for shared-state flakiness; `cargo nextest` reports retried passes as flaky instead of hiding them.
 - `proptest` for round-trips and invariants; `insta` snapshots kept small and reviewed (`cargo insta review`), `trycmd` / `assert_cmd` for CLI contracts.
