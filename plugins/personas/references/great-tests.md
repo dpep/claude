@@ -41,7 +41,7 @@ The revert check can be done by reading, which is cheap and usually right, or by
 
 Coverage says code was *executed*. Mutation testing says whether the tests would *notice* if it were wrong: it makes small deliberate changes (flip a comparison, delete a statement, return a constant) and reports each one no test caught. A surviving mutant is a concrete claim — "this line can be wrong and nothing fails."
 
-The evidence that it measures something real: Just et al. (FSE 2014) found that a suite's mutant detection rate correlates with its detection of real faults, more strongly than statement coverage does, and that about 73% of real faults were coupled to common mutants. Inozemtseva and Holmes used mutants as the yardstick for exactly that reason.
+The evidence that it measures something real: Just et al. (FSE 2014) found that a suite's mutant detection rate correlates with its detection of real faults, more strongly than statement coverage does, and that about 73% of real faults were coupled to common mutants. Inozemtseva and Holmes also used mutants as their yardstick.
 
 So are the costs:
 
@@ -55,7 +55,7 @@ Use it when skeptical: a test suite you inherited and don't trust, a refactor th
 
 Inozemtseva and Holmes (ICSE 2014, a distinguished paper) found coverage only weakly to moderately correlated with suite effectiveness once suite size is controlled for, and stronger coverage criteria added no insight. Coverage is good at one thing: **finding code no test touches.** Uncovered changed lines are a certain gap. Covered ones are not a certain pass.
 
-Google's 2020 guidance is the sane middle: there is no ideal number; 60% is acceptable, 75% commendable, 90% exemplary; project-wide goals above 90% are probably not worth it — and **per-commit coverage of changed lines is the number to watch**, where a high bar (90–99%) is reasonable. Beck compared pride in 100% coverage to pride in reading every word of the newspaper. Dodds keeps his small published libraries at 100% because breakage hits many consumers and the code is small; applications get diminishing returns long before that.
+Google's 2020 guidance is the sane middle: there is no ideal number; 60% is acceptable, 75% commendable, 90% exemplary; project-wide goals above 90% are probably not worth it — and **per-commit coverage of changed lines is the number to watch**, where a high bar (90–99%) is reasonable. Dodds keeps his small published libraries at 100% because breakage hits many consumers and the code is small; applications get diminishing returns long before that.
 
 Make coverage diff-scoped and per-test where possible (tools in §13). Together with the revert check it gives the precise gap: "executed by N tests, none fail on the old code."
 
@@ -171,7 +171,7 @@ A table-driven rewrite can shrink a test file tenfold and keep every assertion. 
 
 ## Sources
 
-- Kent Beck, [Test Desiderata](https://testdesiderata.com/); Beck's 2008 Stack Overflow answer, "I get paid for code that works, not for tests" ([context](https://visibletrap.blogspot.com/2012/07/i-get-paid-for-code-that-works-not-for.html)).
+- Kent Beck, [Test Desiderata](https://testdesiderata.com/).
 - Titus Winters, Tom Manshreck, Hyrum Wright (eds.), *Software Engineering at Google*: [ch. 11 Testing Overview](https://abseil.io/resources/swe-book/html/ch11.html), [ch. 12 Unit Testing](https://abseil.io/resources/swe-book/html/ch12.html), [ch. 13 Test Doubles](https://abseil.io/resources/swe-book/html/ch13.html).
 - Google Testing Blog: [Code Coverage Best Practices](https://testing.googleblog.com/2020/08/code-coverage-best-practices.html) (2020); [Change-Detector Tests Considered Harmful](https://testing.googleblog.com/2015/01/testing-on-toilet-change-detector-tests.html); [Prefer Testing Public APIs Over Implementation-Detail Classes](https://testing.googleblog.com/2015/01/testing-on-toilet-prefer-testing-public.html).
 - Kent C. Dodds: [Testing Implementation Details](https://kentcdodds.com/blog/testing-implementation-details); [Write tests. Not too many. Mostly integration.](https://kentcdodds.com/blog/write-tests); [Effective Snapshot Testing](https://kentcdodds.com/blog/effective-snapshot-testing).
